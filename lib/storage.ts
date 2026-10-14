@@ -1,7 +1,7 @@
 import { Habit, HabitLogsMap, Milestone, UserStats } from '@/types/habit';
 
-export const HABIT_STORAGE_KEY = 'focuspulse_habits_v2';
-export const LOGS_STORAGE_KEY = 'focuspulse_logs_v2';
+export const HABIT_STORAGE_KEY = 'focuspulse_habits_v3';
+export const LOGS_STORAGE_KEY = 'focuspulse_logs_v3';
 export const LAST_ACTIVE_KEY = 'focuspulse_last_active';
 
 export function getTodayKey(): string {
@@ -24,7 +24,11 @@ export function parseDateKey(key: string): Date {
   return new Date(y, m - 1, d);
 }
 
-export const DEFAULT_HABITS: Habit[] = [
+// Clean slate default: no dummy habits on fresh install
+export const DEFAULT_HABITS: Habit[] = [];
+
+// Optional starter templates for inspiration (only applied if user chooses)
+export const DEMO_HABIT_TEMPLATES: Habit[] = [
   {
     id: 'habit-1',
     title: 'Morning Hydration & Sunlight',
@@ -34,7 +38,7 @@ export const DEFAULT_HABITS: Habit[] = [
     reminderEnabled: true,
     promptMessage: 'Have you had your morning glass of water and sunlight walk?',
     daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
-    createdAt: new Date(Date.now() - 30 * 86400000).toISOString(),
+    createdAt: new Date().toISOString(),
     color: '#06B6D4', // cyan
   },
   {
@@ -46,7 +50,7 @@ export const DEFAULT_HABITS: Habit[] = [
     reminderEnabled: true,
     promptMessage: 'Ready for your 45-minute deep focus block?',
     daysOfWeek: [1, 2, 3, 4, 5],
-    createdAt: new Date(Date.now() - 25 * 86400000).toISOString(),
+    createdAt: new Date().toISOString(),
     color: '#6366F1', // indigo
   },
   {
@@ -58,7 +62,7 @@ export const DEFAULT_HABITS: Habit[] = [
     reminderEnabled: true,
     promptMessage: 'Time to get your body moving and shake off sedentary fatigue!',
     daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
-    createdAt: new Date(Date.now() - 20 * 86400000).toISOString(),
+    createdAt: new Date().toISOString(),
     color: '#10B981', // emerald
   },
   {
@@ -70,64 +74,54 @@ export const DEFAULT_HABITS: Habit[] = [
     reminderEnabled: true,
     promptMessage: 'Screens down — have you opened your book for tonight?',
     daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
-    createdAt: new Date(Date.now() - 15 * 86400000).toISOString(),
+    createdAt: new Date().toISOString(),
     color: '#F59E0B', // amber
   },
 ];
 
 /**
- * Generate starter completion history for the previous 21 days
- * so the initial view has an authentic streak and rich visual heatmap.
+ * Optional demo generator (only used if explicitly imported)
  */
 export function generateStarterLogs(): HabitLogsMap {
-  const logs: HabitLogsMap = {};
-  const today = new Date();
-
-  // Seed completions for the past 21 days with realistic high consistency
-  for (let i = 21; i >= 1; i--) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    const key = formatDateKey(d);
-
-    // High consistency: complete 3 or 4 habits most days
-    const completed: string[] = ['habit-1', 'habit-2'];
-    if (i % 3 !== 0) {
-      completed.push('habit-3');
-    }
-    if (i % 2 === 0) {
-      completed.push('habit-4');
-    }
-
-    logs[key] = {
-      completedHabitIds: completed,
-      reflectionMood: i % 4 === 0 ? 'steady' : 'great',
-    };
-  }
-
-  // Today initial state (habit-1 already checked to show active progress)
-  const todayKey = formatDateKey(today);
-  logs[todayKey] = {
-    completedHabitIds: ['habit-1'],
-    reflectionMood: 'great',
-  };
-
-  return logs;
+  return {};
 }
 
 export function loadHabitsFromStorage(): Habit[] {
-  if (typeof window === 'undefined') return DEFAULT_HABITS;
+  if (typeof window === 'undefined') return [];
   try {
+    // Clean up any legacy dummy data from earlier demo versions
+    const legacyHabits = localStorage.getItem('focuspulse_habits_v2');
+    if (legacyHabits && !localStorage.getItem(HABIT_STORAGE_KEY)) {
+      try {
+        const parsedLegacy = JSON.parse(legacyHabits);
+        // If legacy only contained the default dummy sample habits, clear them out
+        const isPureDummy =
+          Array.isArray(parsedLegacy) &&
+          parsedLegacy.length === 4 &&
+          parsedLegacy.every((h: Habit) => ['habit-1', 'habit-2', 'habit-3', 'habit-4'].includes(h.id));
+        if (isPureDummy) {
+          localStorage.removeItem('focuspulse_habits_v2');
+          localStorage.removeItem('focuspulse_logs_v2');
+          localStorage.setItem(HABIT_STORAGE_KEY, JSON.stringify([]));
+          localStorage.setItem(LOGS_STORAGE_KEY, JSON.stringify({}));
+          return [];
+        }
+      } catch {
+        // ignore
+      }
+    }
+
     const saved = localStorage.getItem(HABIT_STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed;
       }
     }
   } catch (e) {
     console.error('Error loading habits:', e);
   }
-  return DEFAULT_HABITS;
+  return [];
 }
 
 export function saveHabitsToStorage(habits: Habit[]) {
@@ -140,7 +134,7 @@ export function saveHabitsToStorage(habits: Habit[]) {
 }
 
 export function loadLogsFromStorage(): HabitLogsMap {
-  if (typeof window === 'undefined') return generateStarterLogs();
+  if (typeof window === 'undefined') return {};
   try {
     const saved = localStorage.getItem(LOGS_STORAGE_KEY);
     if (saved) {
@@ -152,9 +146,7 @@ export function loadLogsFromStorage(): HabitLogsMap {
   } catch (e) {
     console.error('Error loading logs:', e);
   }
-  const starter = generateStarterLogs();
-  saveLogsToStorage(starter);
-  return starter;
+  return {};
 }
 
 export function saveLogsToStorage(logs: HabitLogsMap) {
@@ -163,6 +155,20 @@ export function saveLogsToStorage(logs: HabitLogsMap) {
     localStorage.setItem(LOGS_STORAGE_KEY, JSON.stringify(logs));
   } catch (e) {
     console.error('Error saving logs:', e);
+  }
+}
+
+export function clearAllStorage() {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem('focuspulse_habits_v2');
+    localStorage.removeItem('focuspulse_logs_v2');
+    localStorage.removeItem(HABIT_STORAGE_KEY);
+    localStorage.removeItem(LOGS_STORAGE_KEY);
+    localStorage.setItem(HABIT_STORAGE_KEY, JSON.stringify([]));
+    localStorage.setItem(LOGS_STORAGE_KEY, JSON.stringify({}));
+  } catch (e) {
+    console.error('Error clearing storage:', e);
   }
 }
 

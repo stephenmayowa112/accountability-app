@@ -15,7 +15,7 @@ import {
   calculateStreakStats,
   getHabitStreak,
   DEFAULT_HABITS,
-  generateStarterLogs,
+  clearAllStorage,
 } from '@/lib/storage';
 import {
   getNotificationPermission,
@@ -267,12 +267,9 @@ export default function FocusPulseApp() {
   };
 
   const handleResetData = () => {
-    const starterHabits = DEFAULT_HABITS;
-    const starterLogs = generateStarterLogs();
-    setHabits(starterHabits);
-    setLogs(starterLogs);
-    saveHabitsToStorage(starterHabits);
-    saveLogsToStorage(starterLogs);
+    setHabits([]);
+    setLogs({});
+    clearAllStorage();
   };
 
   const handleToggleViewDensity = (newDensity: 'compact' | 'standard') => {
@@ -492,21 +489,81 @@ export default function FocusPulseApp() {
                     />
                   );
                 })
+              ) : habits.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-800/80 bg-[#0D121F]/70 p-8 sm:p-10 text-center max-w-2xl mx-auto space-y-5">
+                  <div className="h-13 w-13 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto">
+                    <Sparkles className="h-6 w-6" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <h3 className="text-lg font-bold text-white">Your Fresh Clean Slate</h3>
+                    <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                      Zero dummy data or pre-filled logs. FocusPulse is 100% yours from scratch.
+                      Add what you want to track today to start building genuine, personal consistency.
+                    </p>
+                  </div>
+
+                  <div>
+                    <button
+                      onClick={handleOpenNew}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/30 transition-all active:scale-95"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>Create Your First Habit</span>
+                    </button>
+                  </div>
+
+                  {/* Optional Starter Inspiration Chips */}
+                  <div className="pt-4 border-t border-slate-800/60">
+                    <span className="text-[11px] font-medium text-slate-400 block mb-2.5">
+                      Need ideas? Tap one to customize and save it as your own:
+                    </span>
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {[
+                        { title: 'Morning Hydration & Sunlight', category: 'health', color: '#06B6D4', timeOfDay: '07:30', promptMessage: 'Did you drink 500ml water and get morning light?' },
+                        { title: 'Deep Work Sprint (45m)', category: 'focus', color: '#6366F1', timeOfDay: '09:30', promptMessage: 'Ready for an uninterrupted 45-minute focus session?' },
+                        { title: 'Daily Movement / Workout', category: 'fitness', color: '#10B981', timeOfDay: '17:30', promptMessage: 'Did you move your body or hit your workout today?' },
+                        { title: 'Evening Reading (15 mins)', category: 'mindset', color: '#F59E0B', timeOfDay: '21:30', promptMessage: 'Screens down — did you read tonight?' },
+                      ].map((idea) => (
+                        <button
+                          key={idea.title}
+                          onClick={() => {
+                            setEditingHabit({
+                              id: '',
+                              title: idea.title,
+                              description: '',
+                              category: idea.category as HabitCategory,
+                              color: idea.color,
+                              timeOfDay: idea.timeOfDay,
+                              reminderEnabled: true,
+                              promptMessage: idea.promptMessage,
+                              daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+                              createdAt: new Date().toISOString(),
+                            });
+                            setIsHabitModalOpen(true);
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-indigo-500/40 hover:bg-slate-850 text-slate-300 hover:text-white text-xs transition-colors"
+                        >
+                          + {idea.title}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               ) : (
                 <div className="rounded-2xl border border-dashed border-slate-800 bg-[#0C1220]/50 p-8 text-center space-y-3">
-                  <div className="h-12 w-12 rounded-full bg-slate-800/80 text-slate-400 flex items-center justify-center mx-auto">
-                    <Calendar className="h-6 w-6" />
+                  <div className="h-11 w-11 rounded-full bg-slate-800/80 text-slate-400 flex items-center justify-center mx-auto">
+                    <Calendar className="h-5 w-5" />
                   </div>
-                  <h3 className="text-sm font-bold text-white">No habits scheduled for this filter</h3>
+                  <h3 className="text-sm font-bold text-white">No habits scheduled for this day or filter</h3>
                   <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                    Add a new habit or adjust the frequency days to ensure continuous daily progress.
+                    Add a habit for this category or adjust active days of the week.
                   </p>
                   <button
                     onClick={handleOpenNew}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-500 transition-colors"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-500 transition-colors shadow-sm"
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    Create First Habit
+                    Add Habit
                   </button>
                 </div>
               )}

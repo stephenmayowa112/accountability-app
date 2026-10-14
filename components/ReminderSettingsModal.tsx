@@ -11,6 +11,7 @@ import {
   Download,
   Upload,
   RefreshCw,
+  Trash2,
   X,
   Check,
   Smartphone,
@@ -296,14 +297,16 @@ export const ReminderSettingsModal: React.FC<ReminderSettingsModalProps> = ({
 
                 <button
                   onClick={() => {
-                    if (confirm('Reset to starter habits and sample streak history?')) {
+                    if (confirm('Clear all data? This will remove all habits and logs so the app is 100% fresh and clean from scratch.')) {
                       onResetData();
+                      setImportStatus('All data cleared. Welcome to your fresh clean slate!');
+                      setTimeout(() => setImportStatus(null), 3500);
                     }
                   }}
                   className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-rose-500/40 text-slate-400 hover:text-rose-400 text-xs font-medium transition-colors"
                 >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Reset Starter Data
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Clear All Data (Start Fresh)
                 </button>
               </div>
             </div>
