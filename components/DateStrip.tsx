@@ -3,7 +3,7 @@
 import React from 'react';
 import { formatDateKey, getTodayKey } from '@/lib/storage';
 import { HabitLogsMap, Habit } from '@/types/habit';
-import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 
 interface DateStripProps {
   selectedDate: string;
@@ -20,7 +20,7 @@ export const DateStrip: React.FC<DateStripProps> = ({
 }) => {
   const todayKey = getTodayKey();
 
-  // Generate 7 days centered on today (3 days before, today, 3 days after)
+  // Generate 7 days centered around today (-5 to +1)
   const days = React.useMemo(() => {
     const list: Array<{ dateKey: string; date: Date; isToday: boolean; isFuture: boolean }> = [];
     const baseDate = new Date();
@@ -43,18 +43,18 @@ export const DateStrip: React.FC<DateStripProps> = ({
   const activeHabits = habits.filter((h) => !h.archived);
 
   return (
-    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 rounded-2xl bg-slate-900/40 border border-slate-800/80 backdrop-blur-sm">
-      <div className="flex items-center gap-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 rounded-2xl bg-[#0D121F]/90 border border-slate-800/60 shadow-sm">
+      <div className="flex items-center gap-2.5">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400">
           <Calendar className="h-4 w-4" />
         </div>
         <div>
-          <span className="text-xs font-semibold text-slate-300">
+          <span className="text-xs font-semibold text-slate-200">
             {selectedDate === todayKey ? "Today's Schedule" : selectedDate}
           </span>
           <span className="text-[11px] text-slate-500 block">
             {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', {
-              weekday: 'long',
+              weekday: 'short',
               month: 'short',
               day: 'numeric',
             })}
@@ -79,18 +79,18 @@ export const DateStrip: React.FC<DateStripProps> = ({
             <button
               key={item.dateKey}
               onClick={() => onSelectDate(item.dateKey)}
-              className={`flex flex-col items-center justify-center min-w-[48px] py-2 px-2.5 rounded-xl transition-all ${
+              className={`flex flex-col items-center justify-center min-w-[44px] py-1.5 px-2 rounded-xl transition-all ${
                 isSelected
-                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-[1.02]'
+                  ? 'bg-indigo-600 text-white shadow-sm'
                   : item.isToday
-                  ? 'bg-slate-800 text-slate-200 border border-indigo-500/40'
-                  : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-slate-800/50'
+                  ? 'bg-slate-800/90 text-slate-100 border border-indigo-500/40'
+                  : 'bg-slate-900/50 text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-slate-800/40'
               }`}
             >
               <span className="text-[10px] font-semibold tracking-wider uppercase opacity-80">
                 {weekdayShort}
               </span>
-              <span className="text-sm font-bold mt-0.5 tabular-nums">
+              <span className="text-sm font-semibold mt-0.5 tabular-nums">
                 {dayNum}
               </span>
 
@@ -111,9 +111,9 @@ export const DateStrip: React.FC<DateStripProps> = ({
         {selectedDate !== todayKey && (
           <button
             onClick={() => onSelectDate(todayKey)}
-            className="text-[11px] font-medium text-indigo-400 hover:text-indigo-300 ml-2 px-2.5 py-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 whitespace-nowrap"
+            className="text-[11px] font-medium text-indigo-400 hover:text-indigo-300 ml-1.5 px-2.5 py-1.5 rounded-lg border border-indigo-500/20 bg-indigo-500/10 whitespace-nowrap"
           >
-            Jump to Today
+            Today
           </button>
         )}
       </div>

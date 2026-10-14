@@ -6,6 +6,13 @@ import { playTimerTick, playTimerFinish } from '@/lib/sound';
 import { triggerConfetti } from '@/lib/confetti';
 import { sendWebNotification } from '@/lib/notifications';
 import {
+  AmbientSoundType,
+  AMBIENT_SOUND_OPTIONS,
+  setAmbientSound,
+  setAmbientVolume,
+  stopAmbientSound,
+} from '@/lib/ambientAudio';
+import {
   Play,
   Pause,
   RotateCcw,
@@ -13,6 +20,7 @@ import {
   Timer,
   Coffee,
   Sparkles,
+  Volume1,
   Volume2,
   VolumeX,
   CheckCircle2,
@@ -20,6 +28,12 @@ import {
   Flame,
   Maximize2,
   Minimize2,
+  CloudRain,
+  Radio,
+  Trees,
+  Waves,
+  Headphones,
+  Music,
 } from 'lucide-react';
 
 interface PomodoroViewProps {
@@ -42,6 +56,15 @@ const DEFAULT_DURATIONS: Record<PomodoroMode, number> = {
   longBreak: 15,
 };
 
+const AMBIENT_ICONS: Record<AmbientSoundType, React.ComponentType<{ className?: string }>> = {
+  none: VolumeX,
+  rain: CloudRain,
+  pink_noise: Radio,
+  forest: Trees,
+  waves: Waves,
+  binaural: Headphones,
+};
+
 export const PomodoroView: React.FC<PomodoroViewProps> = ({
   habits,
   onCompleteHabit,
@@ -59,6 +82,45 @@ export const PomodoroView: React.FC<PomodoroViewProps> = ({
     return focusHabit ? focusHabit.id : '';
   });
   const [tickAudio, setTickAudio] = useState(false);
+
+  // Ambient soundscape states
+  const [ambientSound, setAmbientSoundState] = useState<AmbientSoundType>(() => {
+    if (typeof window === 'undefined') return 'none';
+    try {
+      const saved = localStorage.getItem('focuspulse_ambient_sound');
+      if (saved && ['none', 'rain', 'pink_noise', 'forest', 'waves', 'binaural'].includes(saved)) {
+        return saved as AmbientSoundType;
+      }
+    } catch {}
+    return 'none';
+  });
+
+  const [ambientVolume, setAmbientVolumeState] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0.5;
+    try {
+      const saved = localStorage.getItem('focuspulse_ambient_vol');
+      if (saved) return parseFloat(saved);
+    } catch {}
+    return 0.5;
+  });
+
+  const [ambientOnlyWhenRunning, setAmbientOnlyWhenRunning] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    try {
+      const saved = localStorage.getItem('focuspulse_ambient_only_running');
+      if (saved !== null) return saved === 'true';
+    } catch {}
+    return true;
+  });
+
+  const [manualAmbientPlay, setManualAmbientPlay] = useState<boolean>(false);
+  const [isZenSoundMenuOpen, setIsZenSoundMenuOpen] = useState<boolean>(false);
+
+  // Derive active playing state cleanly
+  const isAmbientPlaying =
+    ambientSound !== 'none' &&
+    (ambientOnlyWhenRunning ? isRunning : manualAmbientPlay);
+
   const [completedSessions, setCompletedSessions] = useState<number>(() => {
     if (typeof window === 'undefined') return 0;
     try {
@@ -80,6 +142,61 @@ export const PomodoroView: React.FC<PomodoroViewProps> = ({
   const [showCompletionToast, setShowCompletionToast] = useState<string | null>(null);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sync with Web Audio synthesizer (external system)
+  useEffect(() => {
+    if (isAmbientPlaying) {
+      setAmbientSound(ambientSound, ambientVolume);
+    } else {
+      stopAmbientSound();
+    }
+  }, [isAmbientPlaying, ambientSound, ambientVolume]);
+
+  // Clean up ambient audio on component unmount
+  useEffect(() => {
+    return () => {
+      stopAmbientSound();
+    };
+  }, []);
+
+  const handleSelectSound = (sound: AmbientSoundType) => {
+    setAmbientSoundState(sound);
+    try {
+      localStorage.setItem('focuspulse_ambient_sound', sound);
+    } catch {}
+
+    if (sound === 'none') {
+      setManualAmbientPlay(false);
+    } else {
+      setManualAmbientPlay(true);
+    }
+  };
+
+  const handleVolumeChange = (newVol: number) => {
+    const clamped = Math.max(0, Math.min(1, newVol));
+    setAmbientVolumeState(clamped);
+    setAmbientVolume(clamped);
+    try {
+      localStorage.setItem('focuspulse_ambient_vol', String(clamped));
+    } catch {}
+  };
+
+  const toggleAmbientPlayPause = () => {
+    if (ambientSound === 'none') {
+      handleSelectSound('rain');
+      return;
+    }
+    if (ambientOnlyWhenRunning) {
+      // Switching to manual toggle mode
+      setAmbientOnlyWhenRunning(false);
+      try {
+        localStorage.setItem('focuspulse_ambient_only_running', 'false');
+      } catch {}
+      setManualAmbientPlay(!isAmbientPlaying);
+    } else {
+      setManualAmbientPlay(!manualAmbientPlay);
+    }
+  };
 
   // Save sessions to localStorage
   const saveSessionStats = React.useCallback((sessions: number, minutes: number) => {
@@ -295,7 +412,98 @@ export const PomodoroView: React.FC<PomodoroViewProps> = ({
               </div>
             )}
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Zen Ambient Sound Controller */}
+              <div className="relative">
+                <button
+                  onClick={() => setIsZenSoundMenuOpen(!isZenSoundMenuOpen)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
+                    ambientSound !== 'none' && isAmbientPlaying
+                      ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-300 shadow-md shadow-emerald-500/10'
+                      : 'border-slate-800 bg-slate-900/80 text-slate-400 hover:text-white'
+                  }`}
+                  title="Ambient background soundscape"
+                >
+                  {React.createElement(AMBIENT_ICONS[ambientSound] || Music, { className: 'h-3.5 w-3.5' })}
+                  <span className="hidden sm:inline">
+                    {ambientSound === 'none'
+                      ? 'Soundscape'
+                      : AMBIENT_SOUND_OPTIONS.find((s) => s.id === ambientSound)?.label}
+                  </span>
+                  {ambientSound !== 'none' && isAmbientPlaying && (
+                    <span className="flex items-end gap-0.5 h-2.5 ml-1">
+                      <span className="w-0.5 bg-emerald-400 rounded-full animate-pulse h-2.5" />
+                      <span className="w-0.5 bg-emerald-400 rounded-full animate-pulse h-1.5" />
+                      <span className="w-0.5 bg-emerald-400 rounded-full animate-pulse h-2" />
+                    </span>
+                  )}
+                </button>
+
+                {/* Zen Ambient Popover Menu */}
+                {isZenSoundMenuOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-72 rounded-2xl bg-[#090D17] border border-slate-700 shadow-2xl p-4 z-50 animate-fade-in space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <Music className="h-3.5 w-3.5 text-indigo-400" />
+                        Ambient Soundscapes
+                      </span>
+                      <button
+                        onClick={() => setIsZenSoundMenuOpen(false)}
+                        className="text-[11px] text-slate-400 hover:text-white"
+                      >
+                        Close
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {AMBIENT_SOUND_OPTIONS.map((opt) => {
+                        const Icon = AMBIENT_ICONS[opt.id];
+                        const isSelected = ambientSound === opt.id;
+                        return (
+                          <button
+                            key={opt.id}
+                            onClick={() => {
+                              handleSelectSound(opt.id);
+                              if (opt.id === 'none') setIsZenSoundMenuOpen(false);
+                            }}
+                            className={`flex items-center gap-2 p-2 rounded-xl text-left text-xs font-medium transition-all ${
+                              isSelected
+                                ? 'bg-indigo-600/30 border border-indigo-500/50 text-indigo-200'
+                                : 'bg-slate-900/70 hover:bg-slate-800 text-slate-400 hover:text-white border border-transparent'
+                            }`}
+                          >
+                            <Icon className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">{opt.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Volume slider in Zen */}
+                    {ambientSound !== 'none' && (
+                      <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px] text-slate-400">
+                          <span>Volume</span>
+                          <span className="font-mono text-indigo-300">
+                            {Math.round(ambientVolume * 100)}%
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={ambientVolume}
+                          onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                          className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Subtle Tick Toggle */}
               <button
                 onClick={() => setTickAudio(!tickAudio)}
                 aria-label="Toggle tick audio"
@@ -704,6 +912,160 @@ export const PomodoroView: React.FC<PomodoroViewProps> = ({
                 className="rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-0"
               />
               <span>Automatically enter no-distraction mode when timer starts</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Ambient Soundscapes Selector Card */}
+        <div className="rounded-3xl bg-[#0C1220] border border-slate-800/80 p-5 sm:p-6 shadow-xl space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+                <Music className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  Ambient Background Soundscapes
+                  {ambientSound !== 'none' && isAmbientPlaying && (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                      <span className="flex items-end gap-0.5 h-2">
+                        <span className="w-0.5 bg-emerald-400 rounded-full animate-pulse h-2" />
+                        <span className="w-0.5 bg-emerald-400 rounded-full animate-pulse h-1" />
+                        <span className="w-0.5 bg-emerald-400 rounded-full animate-pulse h-1.5" />
+                      </span>
+                      PLAYING
+                    </span>
+                  )}
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Synthesized acoustic sound masking to deepen focus and eliminate outside distractions.
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Play/Pause sound toggle */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={toggleAmbientPlayPause}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                  isAmbientPlaying
+                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 hover:bg-amber-500/25'
+                    : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                {isAmbientPlaying ? (
+                  <>
+                    <Pause className="h-3.5 w-3.5" />
+                    <span>Pause Soundscape</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-3.5 w-3.5" />
+                    <span>{ambientSound === 'none' ? 'Play Rain' : 'Play Soundscape'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* 6 Soundscape Selection Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+            {AMBIENT_SOUND_OPTIONS.map((sound) => {
+              const Icon = AMBIENT_ICONS[sound.id];
+              const isSelected = ambientSound === sound.id;
+              const isCurrentlyPlaying = isSelected && isAmbientPlaying;
+
+              return (
+                <button
+                  key={sound.id}
+                  onClick={() => handleSelectSound(sound.id)}
+                  className={`group relative p-3 rounded-2xl border text-left transition-all duration-200 flex flex-col justify-between min-h-[96px] ${
+                    isSelected
+                      ? 'bg-gradient-to-b from-indigo-950/70 to-slate-900/90 border-indigo-500/60 shadow-lg shadow-indigo-600/15'
+                      : 'bg-slate-900/60 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <div
+                      className={`h-7 w-7 rounded-lg flex items-center justify-center transition-colors ${
+                        isSelected
+                          ? 'bg-indigo-500/20 text-indigo-400'
+                          : 'bg-slate-800/80 text-slate-400 group-hover:text-slate-200'
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </div>
+
+                    {isCurrentlyPlaying && (
+                      <span className="flex items-end gap-0.5 h-2.5">
+                        <span className="w-0.5 bg-emerald-400 rounded-full animate-pulse h-2.5" />
+                        <span className="w-0.5 bg-emerald-400 rounded-full animate-pulse h-1" />
+                        <span className="w-0.5 bg-emerald-400 rounded-full animate-pulse h-2" />
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-2">
+                    <span
+                      className={`text-xs font-bold block truncate ${
+                        isSelected ? 'text-white' : 'text-slate-300'
+                      }`}
+                    >
+                      {sound.label}
+                    </span>
+                    <span className="text-[10px] text-slate-400 line-clamp-1 block leading-tight mt-0.5">
+                      {sound.description}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Sound Controls Bar: Volume & Timer Linking */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-3 border-t border-slate-800/80 text-xs text-slate-400">
+            <div className="flex items-center gap-3 flex-1 max-w-sm">
+              <button
+                onClick={() => handleVolumeChange(ambientVolume > 0 ? 0 : 0.5)}
+                className="text-slate-400 hover:text-white transition-colors"
+                title="Mute / Unmute"
+              >
+                {ambientVolume === 0 ? (
+                  <VolumeX className="h-4 w-4 text-slate-500" />
+                ) : ambientVolume < 0.5 ? (
+                  <Volume1 className="h-4 w-4 text-indigo-400" />
+                ) : (
+                  <Volume2 className="h-4 w-4 text-indigo-400" />
+                )}
+              </button>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={ambientVolume}
+                onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
+              />
+              <span className="font-mono text-slate-300 min-w-[32px] text-right">
+                {Math.round(ambientVolume * 100)}%
+              </span>
+            </div>
+
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={ambientOnlyWhenRunning}
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  setAmbientOnlyWhenRunning(val);
+                  try {
+                    localStorage.setItem('focuspulse_ambient_only_running', String(val));
+                  } catch {}
+                }}
+                className="rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-0"
+              />
+              <span className="text-slate-300">Play only while session timer is running</span>
             </label>
           </div>
         </div>

@@ -56,6 +56,8 @@ import {
   Filter,
   Timer,
   Smartphone,
+  LayoutList,
+  LayoutGrid,
 } from 'lucide-react';
 
 export default function FocusPulseApp() {
@@ -67,6 +69,13 @@ export default function FocusPulseApp() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [soundMuted, setSoundMutedState] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>('default');
+  const [viewDensity, setViewDensity] = useState<'compact' | 'standard'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('focuspulse_view_density');
+      if (saved === 'compact' || saved === 'standard') return saved;
+    }
+    return 'compact';
+  });
 
   // Modals
   const [isHabitModalOpen, setIsHabitModalOpen] = useState(false);
@@ -266,6 +275,13 @@ export default function FocusPulseApp() {
     saveLogsToStorage(starterLogs);
   };
 
+  const handleToggleViewDensity = (newDensity: 'compact' | 'standard') => {
+    setViewDensity(newDensity);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('focuspulse_view_density', newDensity);
+    }
+  };
+
   // Background interval check for scheduled habit reminders (every 30 seconds)
   useEffect(() => {
     if (!mounted) return;
@@ -325,47 +341,52 @@ export default function FocusPulseApp() {
       />
 
       <main className="flex-1 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Hero Section */}
-        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0F162A] via-[#0B101E] to-[#070A10] border border-slate-800/80 p-6 sm:p-8 shadow-2xl">
-          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-80 h-80 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
-          <div className="absolute bottom-0 left-1/3 -mb-16 w-80 h-80 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
-
-          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="space-y-2 max-w-2xl">
-              <div className="inline-flex items-center gap-2 text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full">
-                <Flame className="h-3.5 w-3.5" />
-                <span>{stats.currentStreak}-Day Active Discipline Streak</span>
+        {/* Clean Focus Header */}
+        <section className="rounded-2xl bg-[#0D121F]/90 border border-slate-800/60 p-5 sm:p-6 shadow-sm">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-xs font-medium text-slate-400 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 text-amber-400 font-mono font-medium">
+                  <Flame className="h-3.5 w-3.5" />
+                  {stats.currentStreak}-day streak
+                </span>
+                <span className="text-slate-700">·</span>
+                <span>{stats.completionRate7d}% 7-day consistency</span>
+                <span className="text-slate-700">·</span>
+                <span className="text-slate-300">
+                  {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                </span>
               </div>
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-white text-balance">
-                Relentless Consistency, Daily Accountability.
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+                Daily Focus & Consistency
               </h1>
-              <p className="text-sm text-slate-400 leading-relaxed max-w-xl">
+              <p className="text-xs text-slate-400 max-w-xl">
                 Stay on track with time-targeted push notifications, Pomodoro deep focus sessions, and visual progress dashboards.
               </p>
             </div>
 
-            {/* Quick Hero Actions */}
-            <div className="flex flex-wrap items-center gap-3 shrink-0">
+            {/* Quick Actions */}
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               <button
                 onClick={() => setActiveTab('pomodoro')}
-                className="flex items-center gap-2 px-4 py-3 rounded-xl bg-indigo-600/20 border border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/30 text-xs font-bold transition-all whitespace-nowrap"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20 text-xs font-medium transition-colors whitespace-nowrap"
               >
-                <Timer className="h-4 w-4" />
-                Pomodoro Mode
+                <Timer className="h-3.5 w-3.5" />
+                <span>Pomodoro Focus</span>
               </button>
               <button
                 onClick={() => setIsCheckInModalOpen(true)}
-                className="flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white text-xs font-bold shadow-lg shadow-indigo-600/25 active:scale-[0.98] transition-all whitespace-nowrap"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700/60 transition-colors whitespace-nowrap"
               >
-                <Sparkles className="h-4 w-4" />
-                Check-In
+                <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+                <span>Check-In</span>
               </button>
               <button
                 onClick={handleOpenNew}
-                className="flex items-center gap-2 px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 hover:border-slate-600 text-slate-200 text-xs font-semibold hover:bg-slate-800 transition-all whitespace-nowrap"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition-colors whitespace-nowrap shadow-sm"
               >
-                <Plus className="h-4 w-4 text-indigo-400" />
-                New Habit
+                <Plus className="h-3.5 w-3.5" />
+                <span>Add Habit</span>
               </button>
             </div>
           </div>
@@ -373,7 +394,7 @@ export default function FocusPulseApp() {
 
         {/* Dynamic Content Views */}
         {activeTab === 'habits' && (
-          <div className="space-y-6">
+          <div className="space-y-5">
             {/* Top Stat Overview */}
             <ProgressOverview
               completedCount={completedTodayIds.length}
@@ -391,9 +412,9 @@ export default function FocusPulseApp() {
               habits={habits}
             />
 
-            {/* Category Filter Bar */}
-            <div className="flex items-center justify-between gap-3 overflow-x-auto pb-1">
-              <div className="flex items-center gap-1.5 p-1 bg-slate-900/80 rounded-xl border border-slate-800/80">
+            {/* Category Filter & View Density Control */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
                 {[
                   { id: 'all', label: 'All Habits' },
                   { id: 'health', label: 'Health' },
@@ -405,10 +426,10 @@ export default function FocusPulseApp() {
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategory(cat.id)}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
+                    className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
                       selectedCategory === cat.id
-                        ? 'bg-indigo-600 text-white shadow-sm'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                        ? 'bg-slate-800 text-white shadow-sm border border-slate-700/70'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
                     }`}
                   >
                     {cat.label}
@@ -416,13 +437,43 @@ export default function FocusPulseApp() {
                 ))}
               </div>
 
-              <span className="text-xs text-slate-400 font-mono hidden sm:inline-block">
-                {filteredDueHabits.length} scheduled for this day
-              </span>
+              {/* View Mode Toggle: Clean Minimal vs Detailed */}
+              <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                <span className="text-xs text-slate-500 font-mono">
+                  {filteredDueHabits.length} scheduled
+                </span>
+
+                <div className="flex items-center gap-1 p-0.5 rounded-lg bg-slate-900/90 border border-slate-800/60">
+                  <button
+                    onClick={() => handleToggleViewDensity('compact')}
+                    title="Clean Minimalist View"
+                    className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md font-medium transition-colors ${
+                      viewDensity === 'compact'
+                        ? 'bg-slate-800 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-slate-300'
+                    }`}
+                  >
+                    <LayoutList className="h-3 w-3" />
+                    <span>Minimal</span>
+                  </button>
+                  <button
+                    onClick={() => handleToggleViewDensity('standard')}
+                    title="Detailed View with 7-Day Stats"
+                    className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md font-medium transition-colors ${
+                      viewDensity === 'standard'
+                        ? 'bg-slate-800 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-slate-300'
+                    }`}
+                  >
+                    <LayoutGrid className="h-3 w-3" />
+                    <span>Detailed</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Habit Cards Grid */}
-            <div className="space-y-3">
+            <div className={viewDensity === 'compact' ? 'space-y-2' : 'space-y-3'}>
               {filteredDueHabits.length > 0 ? (
                 filteredDueHabits.map((habit) => {
                   const isCompleted = completedTodayIds.includes(habit.id);
@@ -437,6 +488,7 @@ export default function FocusPulseApp() {
                       logs={logs}
                       onEdit={handleOpenEdit}
                       onDelete={handleDeleteHabit}
+                      compactView={viewDensity === 'compact'}
                     />
                   );
                 })
