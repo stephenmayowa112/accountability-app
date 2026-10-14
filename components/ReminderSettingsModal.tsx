@@ -13,6 +13,7 @@ import {
   RefreshCw,
   X,
   Check,
+  Smartphone,
 } from 'lucide-react';
 import {
   NotificationPermissionState,
@@ -37,6 +38,7 @@ interface ReminderSettingsModalProps {
   logs: HabitLogsMap;
   onImportData: (habits: Habit[], logs: HabitLogsMap) => void;
   onResetData: () => void;
+  onOpenMobileInstall?: () => void;
 }
 
 export const ReminderSettingsModal: React.FC<ReminderSettingsModalProps> = ({
@@ -50,6 +52,7 @@ export const ReminderSettingsModal: React.FC<ReminderSettingsModalProps> = ({
   logs,
   onImportData,
   onResetData,
+  onOpenMobileInstall,
 }) => {
   const [testSent, setTestSent] = useState(false);
   const [importStatus, setImportStatus] = useState<string | null>(null);
@@ -305,6 +308,39 @@ export const ReminderSettingsModal: React.FC<ReminderSettingsModalProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Section 4: Mobile Installation */}
+          {onOpenMobileInstall && (
+            <div className="space-y-3">
+              <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider block">
+                4. Mobile Phone Installation
+              </span>
+
+              <div className="rounded-2xl bg-gradient-to-r from-cyan-950/30 to-indigo-950/30 border border-cyan-500/30 p-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0">
+                    <Smartphone className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-bold text-white block">Add to Home Screen</span>
+                    <span className="text-xs text-slate-400">
+                      Step-by-step instructions for iPhone and Android devices
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    onClose();
+                    onOpenMobileInstall();
+                  }}
+                  className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition-all shadow-md shadow-cyan-600/30 whitespace-nowrap"
+                >
+                  View Guide
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

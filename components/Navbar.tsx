@@ -6,10 +6,11 @@ import { usePWAInstall } from '@/hooks/usePWAInstall';
 import { NotificationPermissionState } from '@/lib/notifications';
 
 interface NavbarProps {
-  activeTab: 'habits' | 'analytics' | 'milestones' | 'reminders';
-  setActiveTab: (tab: 'habits' | 'analytics' | 'milestones' | 'reminders') => void;
+  activeTab: 'habits' | 'pomodoro' | 'analytics' | 'milestones' | 'reminders';
+  setActiveTab: (tab: 'habits' | 'pomodoro' | 'analytics' | 'milestones' | 'reminders') => void;
   onOpenNewHabit: () => void;
   onOpenCheckIn: () => void;
+  onOpenMobileInstall: () => void;
   soundMuted: boolean;
   onToggleSound: () => void;
   notificationPermission: NotificationPermissionState;
@@ -21,12 +22,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   setActiveTab,
   onOpenNewHabit,
   onOpenCheckIn,
+  onOpenMobileInstall,
   soundMuted,
   onToggleSound,
   notificationPermission,
   onRequestNotifications,
 }) => {
-  const { isInstallable, install, isIOS } = usePWAInstall();
+  const { isInstallable, install } = usePWAInstall();
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-[#070A10]/90 backdrop-blur-md">
@@ -54,10 +56,10 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Zone 2: Single-Line Nav Links */}
-        <nav className="hidden md:flex items-center gap-1">
+        <nav className="hidden lg:flex items-center gap-1">
           <button
             onClick={() => setActiveTab('habits')}
-            className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
+            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
               activeTab === 'habits'
                 ? 'bg-slate-800/90 text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
@@ -66,8 +68,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             Daily Checklist
           </button>
           <button
+            onClick={() => setActiveTab('pomodoro')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
+              activeTab === 'pomodoro'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+            }`}
+          >
+            <span>Pomodoro Focus</span>
+          </button>
+          <button
             onClick={() => setActiveTab('analytics')}
-            className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
+            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
               activeTab === 'analytics'
                 ? 'bg-slate-800/90 text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
@@ -77,7 +89,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('milestones')}
-            className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
+            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
               activeTab === 'milestones'
                 ? 'bg-slate-800/90 text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
@@ -87,7 +99,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('reminders')}
-            className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
+            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
               activeTab === 'reminders'
                 ? 'bg-slate-800/90 text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
@@ -99,6 +111,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Zone 3: Actions */}
         <div className="flex items-center gap-2 shrink-0">
+          {/* Mobile Install Guide Trigger */}
+          <button
+            onClick={onOpenMobileInstall}
+            title="Install on Mobile Phone"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 transition-colors whitespace-nowrap"
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Mobile</span> Install
+          </button>
+
           {/* Audio Chime Mute Toggle */}
           <button
             onClick={onToggleSound}
@@ -130,17 +152,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               <BellOff className="h-4 w-4" />
             )}
           </button>
-
-          {/* PWA Install Trigger if installable */}
-          {isInstallable && (
-            <button
-              onClick={install}
-              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 transition-colors whitespace-nowrap"
-            >
-              <Download className="h-3.5 w-3.5" />
-              Install App
-            </button>
-          )}
 
           {/* Accountability Check-In Button */}
           <button

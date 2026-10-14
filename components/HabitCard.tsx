@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
-import { Habit, HabitCategory } from '@/types/habit';
+import React, { useMemo } from 'react';
+import { Habit, HabitCategory, HabitLogsMap } from '@/types/habit';
+import { getHabit7DayStats } from '@/lib/storage';
 import {
   Check,
   Bell,
@@ -15,6 +16,7 @@ import {
   Dumbbell,
   Heart,
   CalendarCheck,
+  TrendingUp,
 } from 'lucide-react';
 
 interface HabitCardProps {
@@ -22,6 +24,7 @@ interface HabitCardProps {
   isCompleted: boolean;
   onToggle: (habitId: string) => void;
   streak: number;
+  logs: HabitLogsMap;
   onEdit: (habit: Habit) => void;
   onDelete: (habitId: string) => void;
 }
@@ -42,6 +45,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   isCompleted,
   onToggle,
   streak,
+  logs,
   onEdit,
   onDelete,
 }) => {
@@ -50,6 +54,8 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
   const categoryMeta = CATEGORY_CONFIG[habit.category] || CATEGORY_CONFIG.routine;
   const CategoryIcon = categoryMeta.icon;
+
+  const stats7d = useMemo(() => getHabit7DayStats(habit, logs), [habit, logs]);
 
   React.useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -140,6 +146,75 @@ export const HabitCard: React.FC<HabitCardProps> = ({
               <span className="italic truncate">{habit.promptMessage}</span>
             </div>
           )}
+
+          {/* 7-Day Visual Progress Bar */}
+          <div className="mt-3.5 pt-3 border-t border-slate-800/60">
+            <div className="flex items-center justify-between text-xs mb-1.5">
+              <div className="flex items-center gap-1.5 text-slate-400">
+                <TrendingUp className="h-3.5 w-3.5 text-indigo-400" />
+                <span className="font-medium text-slate-300">7-Day Consistency</span>
+              </div>
+              <div className="flex items-center gap-2 font-mono">
+                <span className="text-[11px] text-slate-400 tabular-nums">
+                  {stats7d.completedCount} of {stats7d.totalScheduled} days
+                </span>
+                <span
+                  className={`text-xs font-bold tabular-nums ${
+                    stats7d.percentage >= 80
+                      ? 'text-emerald-400'
+                      : stats7d.percentage >= 50
+                      ? 'text-cyan-400'
+                      : stats7d.percentage > 0
+                      ? 'text-amber-400'
+                      : 'text-slate-500'
+                  }`}
+                >
+                  {stats7d.percentage}%
+                </span>
+              </div>
+            </div>
+
+            {/* Glowing Progress Track & Bar */}
+            <div className="relative h-2 w-full rounded-full bg-slate-900/90 border border-slate-800/80 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-700 ease-out ${
+                  stats7d.percentage >= 80
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                    : stats7d.percentage >= 50
+                    ? 'bg-gradient-to-r from-indigo-500 to-cyan-400'
+                    : stats7d.percentage > 0
+                    ? 'bg-gradient-to-r from-amber-500 to-amber-400'
+                    : 'bg-slate-700'
+                }`}
+                style={{ width: `${Math.max(stats7d.percentage, 0)}%` }}
+              />
+            </div>
+
+            {/* Day-by-Day Mini Pips */}
+            <div className="flex items-center justify-between mt-2 pt-0.5 px-0.5">
+              {stats7d.days.map((d) => (
+                <div key={d.dateKey} className="flex flex-col items-center gap-1">
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full transition-all ${
+                      d.isCompleted
+                        ? 'bg-emerald-400 shadow-sm shadow-emerald-400/50'
+                        : d.isToday
+                        ? 'bg-indigo-400 ring-2 ring-indigo-500/20'
+                        : 'bg-slate-700/60'
+                    }`}
+                    title={`${d.dateKey}: ${d.isCompleted ? 'Completed' : 'Not completed'}`}
+                  />
+                  <span
+                    className={`text-[9px] font-mono uppercase ${
+                      d.isToday ? 'font-bold text-indigo-300' : 'text-slate-500'
+                    }`}
+                  >
+                    {d.dayLetter}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Options Menu Button (min 44px x 44px touch area) */}

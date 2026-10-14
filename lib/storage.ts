@@ -325,6 +325,68 @@ export function getHabitStreak(habitId: string, logs: HabitLogsMap): number {
   return streak;
 }
 
+export interface Habit7DayStats {
+  percentage: number;
+  completedCount: number;
+  totalScheduled: number;
+  days: Array<{
+    dateKey: string;
+    dayLetter: string;
+    isCompleted: boolean;
+    isScheduled: boolean;
+    isToday: boolean;
+  }>;
+}
+
+/**
+ * Calculates completion rate and day-by-day status for a specific habit over the last 7 days
+ */
+export function getHabit7DayStats(habit: Habit, logs: HabitLogsMap): Habit7DayStats {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayKey = formatDateKey(today);
+
+  let completedCount = 0;
+  let totalScheduled = 0;
+  const days: Habit7DayStats['days'] = [];
+
+  // Last 7 days (6 days ago through today)
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const dateKey = formatDateKey(d);
+    const dayOfWeek = d.getDay();
+    const dayLetter = d.toLocaleDateString('en-US', { weekday: 'narrow' });
+    const isScheduled = habit.daysOfWeek.includes(dayOfWeek);
+    const isCompleted = !!logs[dateKey]?.completedHabitIds?.includes(habit.id);
+
+    if (isScheduled) {
+      totalScheduled++;
+    }
+    if (isCompleted) {
+      completedCount++;
+    }
+
+    days.push({
+      dateKey,
+      dayLetter,
+      isCompleted,
+      isScheduled,
+      isToday: dateKey === todayKey,
+    });
+  }
+
+  const denominator = totalScheduled > 0 ? totalScheduled : 7;
+  const percentage = Math.min(100, Math.round((completedCount / denominator) * 100));
+
+  return {
+    percentage,
+    completedCount,
+    totalScheduled: denominator,
+    days,
+  };
+}
+
 export const MILESTONES: Milestone[] = [
   {
     id: 'first-step',

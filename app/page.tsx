@@ -42,6 +42,8 @@ import { MilestonesView } from '@/components/MilestonesView';
 import { HabitModal } from '@/components/HabitModal';
 import { AccountabilityModal } from '@/components/AccountabilityModal';
 import { ReminderSettingsModal } from '@/components/ReminderSettingsModal';
+import { PomodoroView } from '@/components/PomodoroView';
+import { MobileInstallModal } from '@/components/MobileInstallModal';
 import {
   Plus,
   Flame,
@@ -52,6 +54,8 @@ import {
   Bell,
   Sparkles,
   Filter,
+  Timer,
+  Smartphone,
 } from 'lucide-react';
 
 export default function FocusPulseApp() {
@@ -59,7 +63,7 @@ export default function FocusPulseApp() {
   const [habits, setHabits] = useState<Habit[]>(DEFAULT_HABITS);
   const [logs, setLogs] = useState<HabitLogsMap>({});
   const [selectedDate, setSelectedDate] = useState<string>(getTodayKey());
-  const [activeTab, setActiveTab] = useState<'habits' | 'analytics' | 'milestones' | 'reminders'>('habits');
+  const [activeTab, setActiveTab] = useState<'habits' | 'pomodoro' | 'analytics' | 'milestones' | 'reminders'>('habits');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [soundMuted, setSoundMutedState] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>('default');
@@ -69,6 +73,7 @@ export default function FocusPulseApp() {
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isMobileInstallOpen, setIsMobileInstallOpen] = useState(false);
 
   // Track already fired notifications for current session
   const [lastNotifiedMap, setLastNotifiedMap] = useState<Record<string, number>>({});
@@ -312,6 +317,7 @@ export default function FocusPulseApp() {
         setActiveTab={setActiveTab}
         onOpenNewHabit={handleOpenNew}
         onOpenCheckIn={() => setIsCheckInModalOpen(true)}
+        onOpenMobileInstall={() => setIsMobileInstallOpen(true)}
         soundMuted={soundMuted}
         onToggleSound={handleToggleSound}
         notificationPermission={notificationPermission}
@@ -334,25 +340,32 @@ export default function FocusPulseApp() {
                 Relentless Consistency, Daily Accountability.
               </h1>
               <p className="text-sm text-slate-400 leading-relaxed max-w-xl">
-                Stay on track with time-targeted push notifications, interactive check-ins, and clear progress dashboards built for daily momentum.
+                Stay on track with time-targeted push notifications, Pomodoro deep focus sessions, and visual progress dashboards.
               </p>
             </div>
 
             {/* Quick Hero Actions */}
             <div className="flex flex-wrap items-center gap-3 shrink-0">
               <button
+                onClick={() => setActiveTab('pomodoro')}
+                className="flex items-center gap-2 px-4 py-3 rounded-xl bg-indigo-600/20 border border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/30 text-xs font-bold transition-all whitespace-nowrap"
+              >
+                <Timer className="h-4 w-4" />
+                Pomodoro Mode
+              </button>
+              <button
                 onClick={() => setIsCheckInModalOpen(true)}
                 className="flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white text-xs font-bold shadow-lg shadow-indigo-600/25 active:scale-[0.98] transition-all whitespace-nowrap"
               >
                 <Sparkles className="h-4 w-4" />
-                Accountability Check-In
+                Check-In
               </button>
               <button
                 onClick={handleOpenNew}
                 className="flex items-center gap-2 px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 hover:border-slate-600 text-slate-200 text-xs font-semibold hover:bg-slate-800 transition-all whitespace-nowrap"
               >
                 <Plus className="h-4 w-4 text-indigo-400" />
-                New Daily Habit
+                New Habit
               </button>
             </div>
           </div>
@@ -421,6 +434,7 @@ export default function FocusPulseApp() {
                       isCompleted={isCompleted}
                       onToggle={handleToggleHabit}
                       streak={habitStreak}
+                      logs={logs}
                       onEdit={handleOpenEdit}
                       onDelete={handleDeleteHabit}
                     />
@@ -457,6 +471,14 @@ export default function FocusPulseApp() {
           </div>
         )}
 
+        {activeTab === 'pomodoro' && (
+          <PomodoroView
+            habits={habits}
+            onCompleteHabit={handleToggleHabit}
+            completedTodayIds={completedTodayIds}
+          />
+        )}
+
         {activeTab === 'analytics' && (
           <div className="space-y-6">
             <HeatmapView
@@ -489,12 +511,18 @@ export default function FocusPulseApp() {
                 </div>
               </div>
 
-              <div className="pt-2">
+              <div className="pt-2 flex flex-wrap gap-3">
                 <button
                   onClick={() => setIsSettingsModalOpen(true)}
                   className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all"
                 >
                   Open Full Reminder & Sound Console
+                </button>
+                <button
+                  onClick={() => setIsMobileInstallOpen(true)}
+                  className="px-5 py-2.5 rounded-xl bg-cyan-600/20 border border-cyan-500/40 hover:bg-cyan-600/30 text-cyan-300 text-xs font-bold transition-all"
+                >
+                  Mobile Install Guide
                 </button>
               </div>
             </div>
@@ -505,8 +533,8 @@ export default function FocusPulseApp() {
       </main>
 
       {/* Mobile Ergonomic Bottom Tab Bar (Fixed thumb zone) */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#090D16]/95 backdrop-blur-lg border-t border-slate-800/80 px-2 py-2">
-        <div className="grid grid-cols-4 items-center">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#090D16]/95 backdrop-blur-lg border-t border-slate-800/80 px-2 py-2">
+        <div className="grid grid-cols-5 items-center">
           <button
             onClick={() => setActiveTab('habits')}
             className={`flex flex-col items-center justify-center py-1 transition-colors ${
@@ -515,6 +543,16 @@ export default function FocusPulseApp() {
           >
             <CheckCircle2 className="h-5 w-5" />
             <span className="text-[10px] font-medium mt-1">Checklist</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('pomodoro')}
+            className={`flex flex-col items-center justify-center py-1 transition-colors ${
+              activeTab === 'pomodoro' ? 'text-indigo-400' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Timer className="h-5 w-5" />
+            <span className="text-[10px] font-medium mt-1">Focus</span>
           </button>
 
           <button
@@ -538,11 +576,11 @@ export default function FocusPulseApp() {
           </button>
 
           <button
-            onClick={() => setIsSettingsModalOpen(true)}
+            onClick={() => setIsMobileInstallOpen(true)}
             className="flex flex-col items-center justify-center py-1 text-slate-400 hover:text-slate-200 transition-colors"
           >
-            <Bell className="h-5 w-5" />
-            <span className="text-[10px] font-medium mt-1">Alerts</span>
+            <Smartphone className="h-5 w-5" />
+            <span className="text-[10px] font-medium mt-1">Install</span>
           </button>
         </div>
       </div>
@@ -575,6 +613,12 @@ export default function FocusPulseApp() {
         logs={logs}
         onImportData={handleImportData}
         onResetData={handleResetData}
+        onOpenMobileInstall={() => setIsMobileInstallOpen(true)}
+      />
+
+      <MobileInstallModal
+        isOpen={isMobileInstallOpen}
+        onClose={() => setIsMobileInstallOpen(false)}
       />
     </div>
   );

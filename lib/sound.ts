@@ -122,3 +122,52 @@ export function playReminderTone() {
   osc.start(now);
   osc.stop(now + 0.7);
 }
+
+/**
+ * Play a gentle subtle focus tick
+ */
+export function playTimerTick() {
+  if (getSoundMuted()) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(1200, now);
+  gain.gain.setValueAtTime(0.015, now);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.03);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 0.04);
+}
+
+/**
+ * Play an accomplishment gong/bell when Pomodoro finishes
+ */
+export function playTimerFinish() {
+  if (getSoundMuted()) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const now = ctx.currentTime;
+  const freqs = [523.25, 783.99, 1046.5]; // C5, G5, C6 rich chime
+
+  freqs.forEach((freq, idx) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const start = now + idx * 0.12;
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, start);
+    gain.gain.setValueAtTime(0.2, start);
+    gain.gain.exponentialRampToValueAtTime(0.0005, start + 1.2);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(start);
+    osc.stop(start + 1.25);
+  });
+}
