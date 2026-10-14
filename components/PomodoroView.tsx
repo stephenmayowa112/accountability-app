@@ -18,6 +18,8 @@ import {
   CheckCircle2,
   Target,
   Flame,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 
 interface PomodoroViewProps {
@@ -49,6 +51,9 @@ export const PomodoroView: React.FC<PomodoroViewProps> = ({
   const [durationMinutes, setDurationMinutes] = useState(DEFAULT_DURATIONS.focus);
   const [timeLeft, setTimeLeft] = useState(DEFAULT_DURATIONS.focus * 60);
   const [isRunning, setIsRunning] = useState(false);
+  const [isZenMode, setIsZenMode] = useState(false);
+  const [autoZenOnStart, setAutoZenOnStart] = useState(false);
+
   const [linkedHabitId, setLinkedHabitId] = useState<string>(() => {
     const focusHabit = habits.find((h) => h.category === 'focus') || habits[0];
     return focusHabit ? focusHabit.id : '';
@@ -150,6 +155,44 @@ export const PomodoroView: React.FC<PomodoroViewProps> = ({
     };
   }, [isRunning, tickAudio, handleTimerComplete]);
 
+  // Keyboard shortcuts when in Zen / Fullscreen mode
+  useEffect(() => {
+    if (!isZenMode) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsZenMode(false);
+        if (typeof document !== 'undefined' && document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {});
+        }
+      } else if (e.code === 'Space') {
+        e.preventDefault();
+        setIsRunning((prev) => !prev);
+      } else if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        setIsRunning(false);
+        setTimeLeft(durationMinutes * 60);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isZenMode, durationMinutes]);
+
+  const enterZenMode = (withBrowserFullscreen = true) => {
+    setIsZenMode(true);
+    if (withBrowserFullscreen && typeof document !== 'undefined' && !document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  };
+
+  const exitZenMode = () => {
+    setIsZenMode(false);
+    if (typeof document !== 'undefined' && document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
+  };
+
   const switchMode = (newMode: PomodoroMode, newDuration?: number) => {
     setIsRunning(false);
     setMode(newMode);
@@ -160,7 +203,11 @@ export const PomodoroView: React.FC<PomodoroViewProps> = ({
   };
 
   const toggleTimer = () => {
-    setIsRunning(!isRunning);
+    const willRun = !isRunning;
+    setIsRunning(willRun);
+    if (willRun && autoZenOnStart && !isZenMode) {
+      enterZenMode(false);
+    }
   };
 
   const resetTimer = () => {
@@ -196,301 +243,516 @@ export const PomodoroView: React.FC<PomodoroViewProps> = ({
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - progressRatio * circumference;
 
+  const zenRadius = 145;
+  const zenCircumference = 2 * Math.PI * zenRadius;
+  const zenStrokeDashoffset = zenCircumference - progressRatio * zenCircumference;
+
   const linkedHabit = habits.find((h) => h.id === linkedHabitId);
   const isLinkedHabitDone = linkedHabitId ? completedTodayIds.includes(linkedHabitId) : false;
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      {/* Completion Toast Banner if finished */}
-      {showCompletionToast && (
-        <div className="rounded-2xl bg-gradient-to-r from-emerald-950/80 via-slate-900 to-indigo-950/80 border border-emerald-500/40 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xl animate-fade-in">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-              <Sparkles className="h-5 w-5" />
+    <>
+      {/* =========================================================================
+          FULLSCREEN NO-DISTRACTION ZEN MODE OVERLAY
+         ========================================================================= */}
+      {isZenMode && (
+        <div className="fixed inset-0 z-50 bg-[#04060D] text-white flex flex-col justify-between p-6 sm:p-12 overflow-hidden select-none animate-fade-in">
+          {/* Ambient Breathing Background Glow */}
+          <div
+            className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full blur-[120px] pointer-events-none transition-all duration-1000 ${
+              isRunning
+                ? mode === 'focus'
+                  ? 'bg-indigo-600/20 scale-110'
+                  : 'bg-emerald-600/20 scale-110'
+                : 'bg-slate-800/10 scale-95'
+            }`}
+          />
+
+          {/* Top Bar in Zen Mode */}
+          <div className="relative z-10 flex items-center justify-between gap-4 w-full max-w-5xl mx-auto">
+            <div className="flex items-center gap-3">
+              <span className="flex h-3 w-3 relative">
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                  mode === 'focus' ? 'bg-indigo-400' : 'bg-emerald-400'
+                }`} />
+                <span className={`relative inline-flex rounded-full h-3 w-3 ${
+                  mode === 'focus' ? 'bg-indigo-500' : 'bg-emerald-500'
+                }`} />
+              </span>
+              <span className="text-xs font-bold tracking-wider uppercase text-slate-300">
+                {mode === 'focus' ? 'Deep Focus Immersion' : 'Resting Phase'}
+              </span>
+              <span className="text-slate-600 font-mono">·</span>
+              <span className="text-xs font-mono text-slate-400">
+                Session #{completedSessions + 1}
+              </span>
             </div>
-            <div>
-              <h4 className="text-sm font-bold text-white">Focus Session Complete!</h4>
-              <p className="text-xs text-slate-300 mt-0.5">{showCompletionToast}</p>
+
+            {linkedHabit && (
+              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/80 border border-slate-800 text-xs text-indigo-300">
+                <Target className="h-3.5 w-3.5 text-indigo-400" />
+                <span className="truncate max-w-xs">{linkedHabit.title}</span>
+              </div>
+            )}
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setTickAudio(!tickAudio)}
+                aria-label="Toggle tick audio"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-800 bg-slate-900/80 text-xs text-slate-400 hover:text-white transition-colors"
+              >
+                {tickAudio ? <Volume2 className="h-3.5 w-3.5 text-indigo-400" /> : <VolumeX className="h-3.5 w-3.5" />}
+                <span className="hidden sm:inline">{tickAudio ? 'Tick On' : 'Tick Muted'}</span>
+              </button>
+
+              <button
+                onClick={exitZenMode}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs font-medium text-slate-300 hover:text-white transition-colors"
+              >
+                <Minimize2 className="h-3.5 w-3.5" />
+                <span>Exit No-Distraction <span className="hidden sm:inline text-slate-500 font-mono">[Esc]</span></span>
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-stretch sm:self-auto">
-            {linkedHabit && !isLinkedHabitDone && (
+          {/* Center Stage: Immense Clock & Circular Ring */}
+          <div className="relative z-10 flex flex-col items-center justify-center my-auto">
+            <div className="relative flex items-center justify-center">
+              <svg className="w-80 h-80 sm:w-96 sm:h-96 md:w-[420px] md:h-[420px] transform -rotate-90">
+                <circle
+                  cx="50%"
+                  cy="50%"
+                  r={zenRadius}
+                  stroke="#172033"
+                  strokeWidth="8"
+                  fill="transparent"
+                  className="opacity-50"
+                />
+                <circle
+                  cx="50%"
+                  cy="50%"
+                  r={zenRadius}
+                  stroke={mode === 'focus' ? 'url(#zenGradFocus)' : 'url(#zenGradBreak)'}
+                  strokeWidth="10"
+                  fill="transparent"
+                  strokeDasharray={zenCircumference}
+                  strokeDashoffset={zenStrokeDashoffset}
+                  strokeLinecap="round"
+                  className="transition-all duration-700 ease-out"
+                />
+                <defs>
+                  <linearGradient id="zenGradFocus" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#6366F1" />
+                    <stop offset="50%" stopColor="#06B6D4" />
+                    <stop offset="100%" stopColor="#10B981" />
+                  </linearGradient>
+                  <linearGradient id="zenGradBreak" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#10B981" />
+                    <stop offset="100%" stopColor="#06B6D4" />
+                  </linearGradient>
+                </defs>
+              </svg>
+
+              <div className="absolute flex flex-col items-center justify-center text-center px-4">
+                <span className="font-mono text-7xl sm:text-8xl md:text-9xl font-black text-white tracking-tighter tabular-nums drop-shadow-2xl">
+                  {timeFormatted}
+                </span>
+                <span className="text-xs sm:text-sm font-semibold uppercase tracking-widest text-slate-400 mt-2">
+                  {mode === 'focus'
+                    ? isRunning
+                      ? 'Single-tasking · Deep attention'
+                      : 'Session Paused'
+                    : 'Step back, breathe, and hydrate'}
+                </span>
+              </div>
+            </div>
+
+            {/* Floating Minimal Controls */}
+            <div className="flex items-center gap-4 mt-8">
               <button
-                onClick={handleMarkLinkedHabitDone}
-                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/30 transition-all"
+                onClick={resetTimer}
+                title="Reset [R]"
+                className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900/80 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
               >
-                <CheckCircle2 className="h-4 w-4" />
-                Mark Habit Done
+                <RotateCcw className="h-5 w-5" />
               </button>
+
+              <button
+                onClick={toggleTimer}
+                className={`flex items-center justify-center gap-2.5 h-16 px-10 rounded-2xl text-base font-bold text-white shadow-2xl transition-all active:scale-95 ${
+                  isRunning
+                    ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-600/30'
+                    : mode === 'focus'
+                    ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 shadow-indigo-600/40'
+                    : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/40'
+                }`}
+              >
+                {isRunning ? (
+                  <>
+                    <Pause className="h-6 w-6 fill-current" />
+                    <span>Pause</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-6 w-6 fill-current ml-0.5" />
+                    <span>Resume Focus</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={skipPhase}
+                title="Skip to next phase"
+                className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900/80 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              >
+                <SkipForward className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* If finished: quick Habit check-off */}
+            {showCompletionToast && linkedHabit && !isLinkedHabitDone && (
+              <div className="mt-6 flex items-center gap-3 p-3 rounded-2xl bg-emerald-950/80 border border-emerald-500/40 animate-fade-in">
+                <span className="text-xs text-emerald-200">Session complete!</span>
+                <button
+                  onClick={handleMarkLinkedHabitDone}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/30"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  Mark &ldquo;{linkedHabit.title}&rdquo; Done
+                </button>
+              </div>
             )}
-            <button
-              onClick={() => setShowCompletionToast(null)}
-              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors"
-            >
-              Dismiss
-            </button>
+          </div>
+
+          {/* Bottom Bar in Zen Mode */}
+          <div className="relative z-10 w-full max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400 border-t border-slate-900 pt-4 font-mono">
+            <span>
+              🍅 {completedSessions} sessions · {totalFocusMinutes}m focus logged today
+            </span>
+            <span className="text-[11px] text-slate-500">
+              Shortcuts: [Space] Pause/Start · [R] Reset · [Esc] Exit
+            </span>
           </div>
         </div>
       )}
 
-      {/* Main Pomodoro Panel */}
-      <div className="relative overflow-hidden rounded-3xl bg-[#0C1220] border border-slate-800/80 p-6 sm:p-8 shadow-2xl flex flex-col items-center">
-        {/* Ambient background glows */}
-        <div
-          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full blur-3xl pointer-events-none transition-opacity duration-1000 ${
-            isRunning
-              ? mode === 'focus'
-                ? 'bg-indigo-500/15 opacity-100'
-                : 'bg-emerald-500/15 opacity-100'
-              : 'opacity-0'
-          }`}
-        />
+      {/* =========================================================================
+          STANDARD POMODORO DASHBOARD VIEW
+         ========================================================================= */}
+      <div className="space-y-6 max-w-4xl mx-auto">
+        {/* Completion Toast Banner if finished */}
+        {showCompletionToast && (
+          <div className="rounded-2xl bg-gradient-to-r from-emerald-950/80 via-slate-900 to-indigo-950/80 border border-emerald-500/40 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xl animate-fade-in">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-white">Focus Session Complete!</h4>
+                <p className="text-xs text-slate-300 mt-0.5">{showCompletionToast}</p>
+              </div>
+            </div>
 
-        {/* Mode Selector Tabs */}
-        <div className="flex items-center gap-1 p-1 rounded-2xl bg-slate-900/90 border border-slate-800 mb-6">
-          <button
-            onClick={() => switchMode('focus')}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-              mode === 'focus'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Timer className="h-3.5 w-3.5" />
-            Focus
-          </button>
-          <button
-            onClick={() => switchMode('shortBreak')}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-              mode === 'shortBreak'
-                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Coffee className="h-3.5 w-3.5" />
-            Short Break
-          </button>
-          <button
-            onClick={() => switchMode('longBreak')}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-              mode === 'longBreak'
-                ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/30'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Coffee className="h-3.5 w-3.5" />
-            Long Break
-          </button>
-        </div>
-
-        {/* Duration Presets for Current Mode */}
-        <div className="flex items-center gap-1.5 mb-6">
-          <span className="text-[11px] text-slate-500 font-mono mr-1">Presets:</span>
-          {PRESET_DURATIONS[mode].map((min) => (
-            <button
-              key={min}
-              onClick={() => {
-                setDurationMinutes(min);
-                setTimeLeft(min * 60);
-                setIsRunning(false);
-              }}
-              className={`px-3 py-1 rounded-lg text-xs font-mono font-medium border transition-colors ${
-                durationMinutes === min
-                  ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300'
-                  : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:border-slate-700'
-              }`}
-            >
-              {min}m
-            </button>
-          ))}
-        </div>
-
-        {/* Circular Countdown Progress Ring */}
-        <div className="relative my-4 flex items-center justify-center">
-          <svg className="w-64 h-64 sm:w-72 sm:h-72 transform -rotate-90">
-            {/* Background Track */}
-            <circle
-              cx="50%"
-              cy="50%"
-              r={radius}
-              stroke="#1e293b"
-              strokeWidth="10"
-              fill="transparent"
-              className="opacity-40"
-            />
-            {/* Progress Stroke */}
-            <circle
-              cx="50%"
-              cy="50%"
-              r={radius}
-              stroke={mode === 'focus' ? 'url(#pomodoroGradFocus)' : 'url(#pomodoroGradBreak)'}
-              strokeWidth="10"
-              fill="transparent"
-              strokeDasharray={circumference}
-              strokeDashoffset={strokeDashoffset}
-              strokeLinecap="round"
-              className="transition-all duration-700 ease-out"
-            />
-            <defs>
-              <linearGradient id="pomodoroGradFocus" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#6366F1" />
-                <stop offset="50%" stopColor="#06B6D4" />
-                <stop offset="100%" stopColor="#10B981" />
-              </linearGradient>
-              <linearGradient id="pomodoroGradBreak" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#10B981" />
-                <stop offset="100%" stopColor="#06B6D4" />
-              </linearGradient>
-            </defs>
-          </svg>
-
-          {/* Center Digital Timer Content */}
-          <div className="absolute flex flex-col items-center justify-center text-center">
-            <span className="font-mono text-5xl sm:text-6xl font-extrabold text-white tracking-tight tabular-nums drop-shadow-md">
-              {timeFormatted}
-            </span>
-            <span className="text-xs font-semibold uppercase tracking-wider mt-2 text-slate-400">
-              {mode === 'focus' ? (isRunning ? 'In Deep Focus' : 'Focus Session') : 'Resting & Recharging'}
-            </span>
-            {linkedHabit && (
-              <span className="text-[11px] text-indigo-400 mt-1 max-w-[180px] truncate">
-                🎯 {linkedHabit.title}
-              </span>
-            )}
+            <div className="flex items-center gap-2 self-stretch sm:self-auto">
+              {linkedHabit && !isLinkedHabitDone && (
+                <button
+                  onClick={handleMarkLinkedHabitDone}
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/30 transition-all"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  Mark Habit Done
+                </button>
+              )}
+              <button
+                onClick={() => setShowCompletionToast(null)}
+                className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors"
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Primary Controls */}
-        <div className="flex items-center gap-3 mt-6">
-          <button
-            onClick={resetTimer}
-            aria-label="Reset timer"
-            title="Reset timer"
-            className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900/80 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-          >
-            <RotateCcw className="h-5 w-5" />
-          </button>
-
-          <button
-            onClick={toggleTimer}
-            className={`flex items-center justify-center gap-2 h-14 px-8 rounded-2xl text-sm font-bold text-white shadow-xl transition-all active:scale-95 ${
+        {/* Main Pomodoro Panel */}
+        <div className="relative overflow-hidden rounded-3xl bg-[#0C1220] border border-slate-800/80 p-6 sm:p-8 shadow-2xl flex flex-col items-center">
+          {/* Ambient background glows */}
+          <div
+            className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full blur-3xl pointer-events-none transition-opacity duration-1000 ${
               isRunning
-                ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-600/30'
-                : mode === 'focus'
-                ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 shadow-indigo-600/30'
-                : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30'
+                ? mode === 'focus'
+                  ? 'bg-indigo-500/15 opacity-100'
+                  : 'bg-emerald-500/15 opacity-100'
+                : 'opacity-0'
             }`}
-          >
-            {isRunning ? (
-              <>
-                <Pause className="h-5 w-5 fill-current" />
-                <span>Pause</span>
-              </>
-            ) : (
-              <>
-                <Play className="h-5 w-5 fill-current ml-0.5" />
-                <span>Start Session</span>
-              </>
-            )}
-          </button>
+          />
 
-          <button
-            onClick={skipPhase}
-            aria-label="Skip phase"
-            title="Skip to next phase"
-            className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900/80 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-          >
-            <SkipForward className="h-5 w-5" />
-          </button>
-        </div>
+          {/* Top Bar inside panel: Mode Selector & Enter Distraction-Free Mode */}
+          <div className="flex flex-wrap items-center justify-between gap-3 w-full mb-6">
+            <div className="flex items-center gap-1 p-1 rounded-2xl bg-slate-900/90 border border-slate-800">
+              <button
+                onClick={() => switchMode('focus')}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                  mode === 'focus'
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Timer className="h-3.5 w-3.5" />
+                Focus
+              </button>
+              <button
+                onClick={() => switchMode('shortBreak')}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                  mode === 'shortBreak'
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Coffee className="h-3.5 w-3.5" />
+                Break
+              </button>
+              <button
+                onClick={() => switchMode('longBreak')}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                  mode === 'longBreak'
+                    ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/30'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Coffee className="h-3.5 w-3.5" />
+                Long
+              </button>
+            </div>
 
-        {/* Habit Association Selector */}
-        <div className="mt-8 pt-6 border-t border-slate-800/80 w-full max-w-md space-y-3">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-semibold text-slate-300 flex items-center gap-1.5">
-              <Target className="h-3.5 w-3.5 text-indigo-400" />
-              Link Session to Habit
-            </span>
+            {/* Direct Enter No-Distraction Fullscreen button */}
             <button
-              onClick={() => setTickAudio(!tickAudio)}
-              className={`flex items-center gap-1 text-[11px] font-medium transition-colors ${
-                tickAudio ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-400'
-              }`}
+              onClick={() => enterZenMode(true)}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 border border-indigo-500/30 hover:border-indigo-500/60 text-indigo-300 text-xs font-bold hover:bg-slate-800 transition-all shadow-md shadow-indigo-500/10"
             >
-              {tickAudio ? <Volume2 className="h-3 w-3" /> : <VolumeX className="h-3 w-3" />}
-              {tickAudio ? 'Subtle Tick ON' : 'Tick Muted'}
+              <Maximize2 className="h-3.5 w-3.5" />
+              <span>Fullscreen No-Distraction</span>
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
-            <select
-              value={linkedHabitId}
-              onChange={(e) => setLinkedHabitId(e.target.value)}
-              className="flex-1 rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 text-xs text-white focus:border-indigo-500 focus:outline-none"
-            >
-              <option value="">-- No specific habit linked --</option>
-              {habits.map((h) => (
-                <option key={h.id} value={h.id}>
-                  {h.title} {completedTodayIds.includes(h.id) ? '✓ (Done today)' : ''}
-                </option>
-              ))}
-            </select>
+          {/* Duration Presets for Current Mode */}
+          <div className="flex items-center gap-1.5 mb-6">
+            <span className="text-[11px] text-slate-500 font-mono mr-1">Presets:</span>
+            {PRESET_DURATIONS[mode].map((min) => (
+              <button
+                key={min}
+                onClick={() => {
+                  setDurationMinutes(min);
+                  setTimeLeft(min * 60);
+                  setIsRunning(false);
+                }}
+                className={`px-3 py-1 rounded-lg text-xs font-mono font-medium border transition-colors ${
+                  durationMinutes === min
+                    ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300'
+                    : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                }`}
+              >
+                {min}m
+              </button>
+            ))}
+          </div>
 
-            {linkedHabit && isLinkedHabitDone && (
-              <span className="flex items-center gap-1 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-2 rounded-xl whitespace-nowrap">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                Done
+          {/* Circular Countdown Progress Ring */}
+          <div className="relative my-4 flex items-center justify-center">
+            <svg className="w-64 h-64 sm:w-72 sm:h-72 transform -rotate-90">
+              {/* Background Track */}
+              <circle
+                cx="50%"
+                cy="50%"
+                r={radius}
+                stroke="#1e293b"
+                strokeWidth="10"
+                fill="transparent"
+                className="opacity-40"
+              />
+              {/* Progress Stroke */}
+              <circle
+                cx="50%"
+                cy="50%"
+                r={radius}
+                stroke={mode === 'focus' ? 'url(#pomodoroGradFocus)' : 'url(#pomodoroGradBreak)'}
+                strokeWidth="10"
+                fill="transparent"
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeDashoffset}
+                strokeLinecap="round"
+                className="transition-all duration-700 ease-out"
+              />
+              <defs>
+                <linearGradient id="pomodoroGradFocus" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#6366F1" />
+                  <stop offset="50%" stopColor="#06B6D4" />
+                  <stop offset="100%" stopColor="#10B981" />
+                </linearGradient>
+                <linearGradient id="pomodoroGradBreak" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#10B981" />
+                  <stop offset="100%" stopColor="#06B6D4" />
+                </linearGradient>
+              </defs>
+            </svg>
+
+            {/* Center Digital Timer Content */}
+            <div className="absolute flex flex-col items-center justify-center text-center">
+              <span className="font-mono text-5xl sm:text-6xl font-extrabold text-white tracking-tight tabular-nums drop-shadow-md">
+                {timeFormatted}
               </span>
-            )}
+              <span className="text-xs font-semibold uppercase tracking-wider mt-2 text-slate-400">
+                {mode === 'focus' ? (isRunning ? 'In Deep Focus' : 'Focus Session') : 'Resting & Recharging'}
+              </span>
+              {linkedHabit && (
+                <span className="text-[11px] text-indigo-400 mt-1 max-w-[180px] truncate">
+                  🎯 {linkedHabit.title}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Primary Controls */}
+          <div className="flex items-center gap-3 mt-6">
+            <button
+              onClick={resetTimer}
+              aria-label="Reset timer"
+              title="Reset timer"
+              className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900/80 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            >
+              <RotateCcw className="h-5 w-5" />
+            </button>
+
+            <button
+              onClick={toggleTimer}
+              className={`flex items-center justify-center gap-2 h-14 px-8 rounded-2xl text-sm font-bold text-white shadow-xl transition-all active:scale-95 ${
+                isRunning
+                  ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-600/30'
+                  : mode === 'focus'
+                  ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 shadow-indigo-600/30'
+                  : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30'
+              }`}
+            >
+              {isRunning ? (
+                <>
+                  <Pause className="h-5 w-5 fill-current" />
+                  <span>Pause</span>
+                </>
+              ) : (
+                <>
+                  <Play className="h-5 w-5 fill-current ml-0.5" />
+                  <span>Start Session</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={skipPhase}
+              aria-label="Skip phase"
+              title="Skip to next phase"
+              className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900/80 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            >
+              <SkipForward className="h-5 w-5" />
+            </button>
+          </div>
+
+          {/* Auto Zen Switch & Habit Association Selector */}
+          <div className="mt-8 pt-6 border-t border-slate-800/80 w-full max-w-md space-y-3">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold text-slate-300 flex items-center gap-1.5">
+                <Target className="h-3.5 w-3.5 text-indigo-400" />
+                Link Session to Habit
+              </span>
+              <button
+                onClick={() => setTickAudio(!tickAudio)}
+                className={`flex items-center gap-1 text-[11px] font-medium transition-colors ${
+                  tickAudio ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-400'
+                }`}
+              >
+                {tickAudio ? <Volume2 className="h-3 w-3" /> : <VolumeX className="h-3 w-3" />}
+                {tickAudio ? 'Subtle Tick ON' : 'Tick Muted'}
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <select
+                value={linkedHabitId}
+                onChange={(e) => setLinkedHabitId(e.target.value)}
+                className="flex-1 rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 text-xs text-white focus:border-indigo-500 focus:outline-none"
+              >
+                <option value="">-- No specific habit linked --</option>
+                {habits.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.title} {completedTodayIds.includes(h.id) ? '✓ (Done today)' : ''}
+                  </option>
+                ))}
+              </select>
+
+              {linkedHabit && isLinkedHabitDone && (
+                <span className="flex items-center gap-1 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-2 rounded-xl whitespace-nowrap">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Done
+                </span>
+              )}
+            </div>
+
+            {/* Auto enter toggle */}
+            <label className="flex items-center gap-2 pt-1 text-xs text-slate-400 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoZenOnStart}
+                onChange={(e) => setAutoZenOnStart(e.target.checked)}
+                className="rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-0"
+              />
+              <span>Automatically enter no-distraction mode when timer starts</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Focus Daily Stats Strip */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="p-4 rounded-2xl bg-[#0C1220] border border-slate-800/80 flex items-center gap-3 shadow-lg">
+            <div className="h-10 w-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
+              <Timer className="h-5 w-5" />
+            </div>
+            <div>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                Completed Today
+              </span>
+              <span className="text-xl font-bold text-white font-mono tabular-nums">
+                {completedSessions} sessions
+              </span>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-[#0C1220] border border-slate-800/80 flex items-center gap-3 shadow-lg">
+            <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+              <Flame className="h-5 w-5 text-emerald-400" />
+            </div>
+            <div>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                Focus Duration
+              </span>
+              <span className="text-xl font-bold text-white font-mono tabular-nums">
+                {totalFocusMinutes} mins
+              </span>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-[#0C1220] border border-slate-800/80 flex items-center gap-3 shadow-lg">
+            <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+              <Sparkles className="h-5 w-5 text-amber-400" />
+            </div>
+            <div>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                Discipline State
+              </span>
+              <span className="text-xl font-bold text-amber-400">
+                {completedSessions >= 4 ? 'Elite Flow' : completedSessions > 0 ? 'Active Focus' : 'Ready'}
+              </span>
+            </div>
           </div>
         </div>
       </div>
-
-      {/* Focus Daily Stats Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 rounded-2xl bg-[#0C1220] border border-slate-800/80 flex items-center gap-3 shadow-lg">
-          <div className="h-10 w-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
-            <Timer className="h-5 w-5" />
-          </div>
-          <div>
-            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-              Completed Today
-            </span>
-            <span className="text-xl font-bold text-white font-mono tabular-nums">
-              {completedSessions} sessions
-            </span>
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-[#0C1220] border border-slate-800/80 flex items-center gap-3 shadow-lg">
-          <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-            <Flame className="h-5 w-5 text-emerald-400" />
-          </div>
-          <div>
-            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-              Focus Duration
-            </span>
-            <span className="text-xl font-bold text-white font-mono tabular-nums">
-              {totalFocusMinutes} mins
-            </span>
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-[#0C1220] border border-slate-800/80 flex items-center gap-3 shadow-lg">
-          <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
-            <Sparkles className="h-5 w-5 text-amber-400" />
-          </div>
-          <div>
-            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-              Discipline State
-            </span>
-            <span className="text-xl font-bold text-amber-400">
-              {completedSessions >= 4 ? 'Elite Flow' : completedSessions > 0 ? 'Active Focus' : 'Ready'}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
+    </>
   );
 };
