@@ -1,0 +1,6 @@
+{
+  "name": "FocusPulse",
+  "description": "Personal reminder and accountability habit tracker with push notifications, streaks, and progress visualization dashboards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
