@@ -58,6 +58,7 @@ import {
   Smartphone,
   LayoutList,
   LayoutGrid,
+  Settings,
 } from 'lucide-react';
 
 export default function FocusPulseApp() {
@@ -323,7 +324,7 @@ export default function FocusPulseApp() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#070A10] pb-24 lg:pb-12">
+    <div className="min-h-screen flex flex-col bg-[#070A10] pb-28 sm:pb-24 lg:pb-12">
       {/* 1. Header / Navbar */}
       <Navbar
         activeTab={activeTab}
@@ -335,6 +336,8 @@ export default function FocusPulseApp() {
         onToggleSound={handleToggleSound}
         notificationPermission={notificationPermission}
         onRequestNotifications={() => setIsSettingsModalOpen(true)}
+        habitCount={habits.filter((h) => !h.archived).length}
+        streak={stats.currentStreak}
       />
 
       <main className="flex-1 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6 space-y-6">
@@ -411,7 +414,7 @@ export default function FocusPulseApp() {
 
             {/* Category Filter & View Density Control */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
+              <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 touch-pan-x overscroll-x-contain">
                 {[
                   { id: 'all', label: 'All Habits' },
                   { id: 'health', label: 'Health' },
@@ -642,54 +645,71 @@ export default function FocusPulseApp() {
       </main>
 
       {/* Mobile Ergonomic Bottom Tab Bar (Fixed thumb zone) */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#090D16]/95 backdrop-blur-lg border-t border-slate-800/80 px-2 py-2">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#090D16]/95 backdrop-blur-lg border-t border-slate-800/80 px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <div className="grid grid-cols-5 items-center">
           <button
             onClick={() => setActiveTab('habits')}
-            className={`flex flex-col items-center justify-center py-1 transition-colors ${
-              activeTab === 'habits' ? 'text-indigo-400' : 'text-slate-400 hover:text-slate-200'
+            className={`flex flex-col items-center justify-center py-1 transition-colors relative ${
+              activeTab === 'habits' ? 'text-indigo-400 font-semibold' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <CheckCircle2 className="h-5 w-5" />
-            <span className="text-[10px] font-medium mt-1">Checklist</span>
+            <span className="text-[10px] mt-1">Checklist</span>
+            {activeTab === 'habits' && (
+              <span className="absolute -top-1 h-0.5 w-6 rounded-full bg-indigo-500" />
+            )}
           </button>
 
           <button
             onClick={() => setActiveTab('pomodoro')}
-            className={`flex flex-col items-center justify-center py-1 transition-colors ${
-              activeTab === 'pomodoro' ? 'text-indigo-400' : 'text-slate-400 hover:text-slate-200'
+            className={`flex flex-col items-center justify-center py-1 transition-colors relative ${
+              activeTab === 'pomodoro' ? 'text-indigo-400 font-semibold' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <Timer className="h-5 w-5" />
-            <span className="text-[10px] font-medium mt-1">Focus</span>
+            <span className="text-[10px] mt-1">Focus</span>
+            {activeTab === 'pomodoro' && (
+              <span className="absolute -top-1 h-0.5 w-6 rounded-full bg-indigo-500" />
+            )}
           </button>
 
           <button
             onClick={() => setActiveTab('analytics')}
-            className={`flex flex-col items-center justify-center py-1 transition-colors ${
-              activeTab === 'analytics' ? 'text-indigo-400' : 'text-slate-400 hover:text-slate-200'
+            className={`flex flex-col items-center justify-center py-1 transition-colors relative ${
+              activeTab === 'analytics' ? 'text-indigo-400 font-semibold' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <BarChart3 className="h-5 w-5" />
-            <span className="text-[10px] font-medium mt-1">Heatmap</span>
+            <span className="text-[10px] mt-1">Heatmap</span>
+            {activeTab === 'analytics' && (
+              <span className="absolute -top-1 h-0.5 w-6 rounded-full bg-indigo-500" />
+            )}
           </button>
 
           <button
             onClick={() => setActiveTab('milestones')}
-            className={`flex flex-col items-center justify-center py-1 transition-colors ${
-              activeTab === 'milestones' ? 'text-indigo-400' : 'text-slate-400 hover:text-slate-200'
+            className={`flex flex-col items-center justify-center py-1 transition-colors relative ${
+              activeTab === 'milestones' ? 'text-indigo-400 font-semibold' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <Trophy className="h-5 w-5" />
-            <span className="text-[10px] font-medium mt-1">Streaks</span>
+            <span className="text-[10px] mt-1">Streaks</span>
+            {activeTab === 'milestones' && (
+              <span className="absolute -top-1 h-0.5 w-6 rounded-full bg-indigo-500" />
+            )}
           </button>
 
           <button
-            onClick={() => setIsMobileInstallOpen(true)}
-            className="flex flex-col items-center justify-center py-1 text-slate-400 hover:text-slate-200 transition-colors"
+            onClick={() => setActiveTab('reminders')}
+            className={`flex flex-col items-center justify-center py-1 transition-colors relative ${
+              activeTab === 'reminders' ? 'text-indigo-400 font-semibold' : 'text-slate-400 hover:text-slate-200'
+            }`}
           >
-            <Smartphone className="h-5 w-5" />
-            <span className="text-[10px] font-medium mt-1">Install</span>
+            <Settings className="h-5 w-5" />
+            <span className="text-[10px] mt-1">Settings</span>
+            {activeTab === 'reminders' && (
+              <span className="absolute -top-1 h-0.5 w-6 rounded-full bg-indigo-500" />
+            )}
           </button>
         </div>
       </div>

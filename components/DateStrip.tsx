@@ -62,7 +62,7 @@ export const DateStrip: React.FC<DateStripProps> = ({
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
+      <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 touch-pan-x overscroll-x-contain">
         {days.map((item) => {
           const isSelected = item.dateKey === selectedDate;
           const dayLog = logs[item.dateKey];
