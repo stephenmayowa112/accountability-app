@@ -1,5 +1,5 @@
-// FocusPulse Service Worker for Habit Reminders & Offline Capabilities
-const CACHE_NAME = 'focuspulse-cache-v1';
+// FocusPulse Service Worker for Habit Reminders, Aggressive Push & Offline Capabilities
+const CACHE_NAME = 'focuspulse-cache-v2';
 const OFFLINE_URLS = ['/', '/icon.svg', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
@@ -26,15 +26,16 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Handle incoming background push notifications if supported
+// Handle incoming background push notifications
 self.addEventListener('push', (event) => {
   let data = {
-    title: 'FocusPulse Habit Reminder',
+    title: 'FocusPulse Habit Alert',
     body: 'Time to check in on your daily habit and keep your streak alive!',
     icon: '/icon.svg',
     badge: '/icon.svg',
-    tag: 'focuspulse-reminder',
-    data: { url: '/' }
+    tag: 'focuspulse-urgent-alert',
+    data: { url: '/' },
+    requireInteraction: true,
   };
 
   if (event.data) {
@@ -49,16 +50,20 @@ self.addEventListener('push', (event) => {
     body: data.body,
     icon: data.icon || '/icon.svg',
     badge: data.badge || '/icon.svg',
-    vibrate: [100, 50, 100],
+    vibrate: [250, 100, 250, 100, 400],
     data: data.data || { url: '/' },
-    tag: data.tag || 'focuspulse-reminder',
+    tag: data.tag || 'focuspulse-urgent-alert',
     renotify: true,
+    requireInteraction: true,
+    actions: [
+      { action: 'open', title: 'Open FocusPulse' },
+    ],
   };
 
   event.waitUntil(self.registration.showNotification(data.title, options));
 });
 
-// Handle clicking on notification
+// Handle clicking on notification or actions
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const targetUrl = (event.notification.data && event.notification.data.url) || '/';

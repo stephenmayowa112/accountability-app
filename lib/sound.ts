@@ -171,3 +171,47 @@ export function playTimerFinish() {
     osc.stop(start + 1.25);
   });
 }
+
+/**
+ * Play a high-urgency, aggressive alert tone designed to capture attention immediately.
+ * Dual-harmonic rapid rising alert pulses (880Hz -> 1480Hz) with sharp attack.
+ */
+export function playAggressiveAlertTone() {
+  if (getSoundMuted()) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const now = ctx.currentTime;
+  const bursts = [0, 0.2];
+
+  bursts.forEach((burstStart) => {
+    const start = now + burstStart;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(880, start);
+    osc.frequency.exponentialRampToValueAtTime(1480, start + 0.14);
+
+    gain.gain.setValueAtTime(0.28, start);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + 0.17);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(start);
+    osc.stop(start + 0.18);
+  });
+}
+
+/**
+ * Trigger haptic vibration on mobile devices if supported by browser/hardware
+ */
+export function triggerDeviceVibration(pattern: number[] = [250, 100, 250, 100, 400]) {
+  if (typeof window !== 'undefined' && 'navigator' in window && 'vibrate' in navigator) {
+    try {
+      navigator.vibrate(pattern);
+    } catch {
+      // ignore
+    }
+  }
+}

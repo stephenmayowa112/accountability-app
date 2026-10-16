@@ -443,3 +443,58 @@ export const MILESTONES: Milestone[] = [
     tier: 'platinum',
   },
 ];
+
+export interface NotificationSettings {
+  aggressiveMode: boolean; // default true: enables repeated nags & persistent alerts
+  morningPlanningReminder: boolean; // default true: alerts user to set today's tasks
+  morningPlanningTime: string; // default "08:00"
+  middayCheckinReminder: boolean; // default true: midday check on pending tasks
+  middayCheckinTime: string; // default "13:00"
+  eveningStreakSaver: boolean; // default true: alerts user before end of day
+  eveningStreakSaverTime: string; // default "20:00"
+  overdueNagging: boolean; // default true: alerts repeatedly for overdue tasks
+  overdueNagIntervalMinutes: number; // default 15
+  soundAlerts: boolean; // default true
+  vibrationAlerts: boolean; // default true
+  inAppBannerAlerts: boolean; // default true
+}
+
+export const NOTIFICATION_SETTINGS_KEY = 'focuspulse_notification_settings_v2';
+
+export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
+  aggressiveMode: true,
+  morningPlanningReminder: true,
+  morningPlanningTime: '08:00',
+  middayCheckinReminder: true,
+  middayCheckinTime: '13:00',
+  eveningStreakSaver: true,
+  eveningStreakSaverTime: '20:00',
+  overdueNagging: true,
+  overdueNagIntervalMinutes: 15,
+  soundAlerts: true,
+  vibrationAlerts: true,
+  inAppBannerAlerts: true,
+};
+
+export function loadNotificationSettings(): NotificationSettings {
+  if (typeof window === 'undefined') return DEFAULT_NOTIFICATION_SETTINGS;
+  try {
+    const saved = localStorage.getItem(NOTIFICATION_SETTINGS_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return { ...DEFAULT_NOTIFICATION_SETTINGS, ...parsed };
+    }
+  } catch (e) {
+    console.error('Error loading notification settings:', e);
+  }
+  return DEFAULT_NOTIFICATION_SETTINGS;
+}
+
+export function saveNotificationSettings(settings: NotificationSettings) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(NOTIFICATION_SETTINGS_KEY, JSON.stringify(settings));
+  } catch (e) {
+    console.error('Error saving notification settings:', e);
+  }
+}
