@@ -70,6 +70,7 @@ export const ReminderSettingsModal: React.FC<ReminderSettingsModalProps> = ({
   const [testSent, setTestSent] = useState(false);
   const [aggressiveTestSent, setAggressiveTestSent] = useState(false);
   const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
 
   if (!isOpen) return null;
 
@@ -132,14 +133,14 @@ export const ReminderSettingsModal: React.FC<ReminderSettingsModalProps> = ({
             onUpdateNotificationSettings(parsed.notificationSettings);
           }
           onImportData(parsed.habits, parsed.logs || {});
-          setImportStatus('Backup restored successfully!');
+          setImportStatus('Backup restored successfully.');
           setTimeout(() => setImportStatus(null), 3500);
         } else {
-          setImportStatus('Invalid backup file format');
+          setImportStatus('Invalid backup file format.');
           setTimeout(() => setImportStatus(null), 3500);
         }
       } catch {
-        setImportStatus('Error reading file');
+        setImportStatus('Error reading backup file.');
         setTimeout(() => setImportStatus(null), 3500);
       }
     };
@@ -156,13 +157,8 @@ export const ReminderSettingsModal: React.FC<ReminderSettingsModalProps> = ({
               <ShieldAlert className="h-4.5 w-4.5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <h3 className="text-base font-bold text-white">
                 Alerts & Accountability Settings
-                {notificationSettings.aggressiveMode && (
-                  <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300">
-                    Relentless Mode
-                  </span>
-                )}
               </h3>
               <p className="text-xs text-slate-400">
                 Configure task planning reminders, persistent alerts, and audio
@@ -532,19 +528,35 @@ export const ReminderSettingsModal: React.FC<ReminderSettingsModalProps> = ({
                   />
                 </label>
 
-                <button
-                  onClick={() => {
-                    if (confirm('Clear all data? This will remove all habits and logs so the app is 100% fresh and clean from scratch.')) {
-                      onResetData();
-                      setImportStatus('All data cleared. Welcome to your fresh clean slate!');
-                      setTimeout(() => setImportStatus(null), 3500);
-                    }
-                  }}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-rose-500/40 text-slate-400 hover:text-rose-400 text-xs font-medium transition-colors"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Clear All Data (Start Fresh)
-                </button>
+                {!confirmReset ? (
+                  <button
+                    onClick={() => setConfirmReset(true)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-rose-500/40 text-slate-400 hover:text-rose-400 text-xs font-medium transition-colors"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Clear All Data
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        onResetData();
+                        setConfirmReset(false);
+                        setImportStatus('All local data cleared.');
+                        setTimeout(() => setImportStatus(null), 3500);
+                      }}
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold transition-colors"
+                    >
+                      Confirm Permanent Reset
+                    </button>
+                    <button
+                      onClick={() => setConfirmReset(false)}
+                      className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>

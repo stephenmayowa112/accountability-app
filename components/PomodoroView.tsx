@@ -40,6 +40,7 @@ interface PomodoroViewProps {
   habits: Habit[];
   onCompleteHabit?: (habitId: string) => void;
   completedTodayIds?: string[];
+  initialHabitId?: string;
 }
 
 type PomodoroMode = 'focus' | 'shortBreak' | 'longBreak';
@@ -69,18 +70,25 @@ export const PomodoroView: React.FC<PomodoroViewProps> = ({
   habits,
   onCompleteHabit,
   completedTodayIds = [],
+  initialHabitId,
 }) => {
+  const initialSelectedHabit =
+    (initialHabitId && habits.find((h) => h.id === initialHabitId)) ||
+    habits.find((h) => h.category === 'focus') ||
+    habits[0];
+
+  const startDur = initialSelectedHabit?.estimatedMinutes || DEFAULT_DURATIONS.focus;
+
   const [mode, setMode] = useState<PomodoroMode>('focus');
-  const [durationMinutes, setDurationMinutes] = useState(DEFAULT_DURATIONS.focus);
-  const [timeLeft, setTimeLeft] = useState(DEFAULT_DURATIONS.focus * 60);
+  const [durationMinutes, setDurationMinutes] = useState(startDur);
+  const [timeLeft, setTimeLeft] = useState(startDur * 60);
   const [isRunning, setIsRunning] = useState(false);
   const [isZenMode, setIsZenMode] = useState(false);
   const [autoZenOnStart, setAutoZenOnStart] = useState(false);
 
-  const [linkedHabitId, setLinkedHabitId] = useState<string>(() => {
-    const focusHabit = habits.find((h) => h.category === 'focus') || habits[0];
-    return focusHabit ? focusHabit.id : '';
-  });
+  const [linkedHabitId, setLinkedHabitId] = useState<string>(
+    initialSelectedHabit ? initialSelectedHabit.id : ''
+  );
   const [tickAudio, setTickAudio] = useState(false);
 
   // Ambient soundscape states
@@ -227,24 +235,24 @@ export const PomodoroView: React.FC<PomodoroViewProps> = ({
 
       // Trigger Web Notification
       const linkedHabit = habits.find((h) => h.id === linkedHabitId);
-      sendWebNotification('Pomodoro Focus Complete! 🎯', {
+      sendWebNotification('Pomodoro Focus Complete', {
         body: linkedHabit
-          ? `Great 25m session! Ready to check off "${linkedHabit.title}"?`
-          : 'High focus session completed. Take a 5-minute break!',
+          ? `Session complete. Ready to check off "${linkedHabit.title}"?`
+          : 'High focus session completed. Take a 5-minute break.',
         tag: 'pomodoro-complete',
       });
 
       setShowCompletionToast(
         linkedHabit
-          ? `Focus block finished! Click below to complete "${linkedHabit.title}".`
-          : 'Focus block finished! Take a restorative short break.'
+          ? `Focus block finished. Click below to complete "${linkedHabit.title}".`
+          : 'Focus block finished. Take a restorative short break.'
       );
     } else {
-      sendWebNotification('Break Finished ☕', {
-        body: 'Break is over! Time to lock into your next focus block.',
+      sendWebNotification('Break Finished', {
+        body: 'Break is over. Time to lock into your next focus block.',
         tag: 'pomodoro-break-complete',
       });
-      setShowCompletionToast('Break finished! Ready for the next focus sprint?');
+      setShowCompletionToast('Break finished. Ready for the next focus sprint?');
     }
   }, [mode, durationMinutes, habits, linkedHabitId, saveSessionStats]);
 
@@ -387,20 +395,12 @@ export const PomodoroView: React.FC<PomodoroViewProps> = ({
 
           {/* Top Bar in Zen Mode */}
           <div className="relative z-10 flex items-center justify-between gap-4 w-full max-w-5xl mx-auto">
-            <div className="flex items-center gap-3">
-              <span className="flex h-3 w-3 relative">
-                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                  mode === 'focus' ? 'bg-indigo-400' : 'bg-emerald-400'
-                }`} />
-                <span className={`relative inline-flex rounded-full h-3 w-3 ${
-                  mode === 'focus' ? 'bg-indigo-500' : 'bg-emerald-500'
-                }`} />
-              </span>
-              <span className="text-xs font-bold tracking-wider uppercase text-slate-300">
+            <div className="flex items-center gap-2.5 text-xs">
+              <span className="font-semibold text-slate-200">
                 {mode === 'focus' ? 'Deep Focus Immersion' : 'Resting Phase'}
               </span>
               <span className="text-slate-600 font-mono">·</span>
-              <span className="text-xs font-mono text-slate-400">
+              <span className="font-mono text-slate-400 tabular-nums">
                 Session #{completedSessions + 1}
               </span>
             </div>
@@ -633,9 +633,9 @@ export const PomodoroView: React.FC<PomodoroViewProps> = ({
           </div>
 
           {/* Bottom Bar in Zen Mode */}
-          <div className="relative z-10 w-full max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400 border-t border-slate-900 pt-4 font-mono">
+          <div className="relative z-10 w-full max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400 border-t border-slate-900 pt-4 font-mono tabular-nums">
             <span>
-              🍅 {completedSessions} sessions · {totalFocusMinutes}m focus logged today
+              {completedSessions} sessions · {totalFocusMinutes}m focus logged today
             </span>
             <span className="text-[11px] text-slate-500">
               Shortcuts: [Space] Pause/Start · [R] Reset · [Esc] Exit
@@ -812,8 +812,8 @@ export const PomodoroView: React.FC<PomodoroViewProps> = ({
                 {mode === 'focus' ? (isRunning ? 'In Deep Focus' : 'Focus Session') : 'Resting & Recharging'}
               </span>
               {linkedHabit && (
-                <span className="text-[11px] text-indigo-400 mt-1 max-w-[180px] truncate">
-                  🎯 {linkedHabit.title}
+                <span className="text-xs text-indigo-300 mt-1 max-w-[200px] truncate">
+                  {linkedHabit.title}
                 </span>
               )}
             </div>

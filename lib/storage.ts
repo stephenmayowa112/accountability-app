@@ -24,67 +24,62 @@ export function parseDateKey(key: string): Date {
   return new Date(y, m - 1, d);
 }
 
-// Clean slate default: no dummy habits on fresh install
-export const DEFAULT_HABITS: Habit[] = [];
-
-// Optional starter templates for inspiration (only applied if user chooses)
-export const DEMO_HABIT_TEMPLATES: Habit[] = [
-  {
-    id: 'habit-1',
-    title: 'Morning Hydration & Sunlight',
-    description: 'Drink 500ml of water and get 10 minutes of direct sunlight upon waking.',
-    category: 'health',
-    timeOfDay: '07:30',
-    reminderEnabled: true,
-    promptMessage: 'Have you had your morning glass of water and sunlight walk?',
-    daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
-    createdAt: new Date().toISOString(),
-    color: '#06B6D4', // cyan
-  },
-  {
-    id: 'habit-2',
-    title: 'Deep Work Sprint (45 mins)',
-    description: 'Uninterrupted deep focus with phone on Do Not Disturb.',
-    category: 'focus',
-    timeOfDay: '10:00',
-    reminderEnabled: true,
-    promptMessage: 'Ready for your 45-minute deep focus block?',
-    daysOfWeek: [1, 2, 3, 4, 5],
-    createdAt: new Date().toISOString(),
-    color: '#6366F1', // indigo
-  },
-  {
-    id: 'habit-3',
-    title: 'Daily Movement or Workout',
-    description: '30+ minutes of brisk walking, resistance training, or mobility work.',
-    category: 'fitness',
-    timeOfDay: '17:30',
-    reminderEnabled: true,
-    promptMessage: 'Time to get your body moving and shake off sedentary fatigue!',
-    daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
-    createdAt: new Date().toISOString(),
-    color: '#10B981', // emerald
-  },
-  {
-    id: 'habit-4',
-    title: 'Evening Digital Sunset & Reading',
-    description: 'Put screens away 45 minutes before sleep and read 15 pages of a book.',
-    category: 'mindset',
-    timeOfDay: '21:30',
-    reminderEnabled: true,
-    promptMessage: 'Screens down — have you opened your book for tonight?',
-    daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
-    createdAt: new Date().toISOString(),
-    color: '#F59E0B', // amber
-  },
-];
+export function getHabitCreatedDateKey(habit: Habit): string {
+  if (!habit.createdAt) return '2000-01-01';
+  try {
+    const d = new Date(habit.createdAt);
+    if (isNaN(d.getTime())) return '2000-01-01';
+    return formatDateKey(d);
+  } catch {
+    return '2000-01-01';
+  }
+}
 
 /**
- * Optional demo generator (only used if explicitly imported)
+ * Determines whether a habit or one-off task is scheduled for a given dateKey.
+ * When `respectCreationDate` is true (used in historical adherence calculations),
+ * habits are not counted as missed on dates prior to their creation.
  */
-export function generateStarterLogs(): HabitLogsMap {
-  return {};
+export function isHabitDueOnDate(
+  habit: Habit,
+  dateKey: string,
+  logs?: HabitLogsMap,
+  respectCreationDate = false
+): boolean {
+  if (habit.archived) return false;
+
+  // One-off daily task
+  if (habit.itemType === 'task') {
+    const target = habit.targetDate || getHabitCreatedDateKey(habit);
+    if (target === dateKey) return true;
+    // Carry over unfinished past tasks to today so they aren't forgotten
+    const todayKey = getTodayKey();
+    if (dateKey === todayKey && target < todayKey && logs) {
+      const wasCompletedOnTarget = logs[target]?.completedHabitIds?.includes(habit.id);
+      const wasCompletedToday = logs[todayKey]?.completedHabitIds?.includes(habit.id);
+      if (!wasCompletedOnTarget || wasCompletedToday) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Recurring habit
+  if (respectCreationDate) {
+    const createdKey = getHabitCreatedDateKey(habit);
+    const wasLoggedThatDay = logs?.[dateKey]?.completedHabitIds?.includes(habit.id);
+    if (dateKey < createdKey && !wasLoggedThatDay) {
+      return false;
+    }
+  }
+
+  const d = parseDateKey(dateKey);
+  const dayOfWeek = d.getDay();
+  return habit.daysOfWeek.includes(dayOfWeek);
 }
+
+// Clean slate default: zero dummy habits on fresh install
+export const DEFAULT_HABITS: Habit[] = [];
 
 export function loadHabitsFromStorage(): Habit[] {
   if (typeof window === 'undefined') return [];
@@ -94,11 +89,12 @@ export function loadHabitsFromStorage(): Habit[] {
     if (legacyHabits && !localStorage.getItem(HABIT_STORAGE_KEY)) {
       try {
         const parsedLegacy = JSON.parse(legacyHabits);
-        // If legacy only contained the default dummy sample habits, clear them out
         const isPureDummy =
           Array.isArray(parsedLegacy) &&
           parsedLegacy.length === 4 &&
-          parsedLegacy.every((h: Habit) => ['habit-1', 'habit-2', 'habit-3', 'habit-4'].includes(h.id));
+          parsedLegacy.every((h: Habit) =>
+            ['habit-1', 'habit-2', 'habit-3', 'habit-4'].includes(h.id)
+          );
         if (isPureDummy) {
           localStorage.removeItem('focuspulse_habits_v2');
           localStorage.removeItem('focuspulse_logs_v2');
@@ -174,6 +170,7 @@ export function clearAllStorage() {
 
 /**
  * Calculates current consecutive streak, longest streak, and completion statistics
+ * using strictly real user data (zero hardcoded minimum streaks or pre-creation penalties).
  */
 export function calculateStreakStats(habits: Habit[], logs: HabitLogsMap): UserStats {
   const activeHabits = habits.filter((h) => !h.archived);
@@ -201,68 +198,93 @@ export function calculateStreakStats(habits: Habit[], logs: HabitLogsMap): UserS
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Consecutive streak calculation
-  // A day counts towards the streak if at least 1 habit scheduled for that day was completed,
-  // or if target was reached. We check backwards from today or yesterday.
+  // Find earliest date a habit was created or logged so we never evaluate days before the user started
+  const earliestCreatedKey = activeHabits.reduce((minKey, h) => {
+    const k = getHabitCreatedDateKey(h);
+    return k < minKey ? k : minKey;
+  }, formatDateKey(today));
+
+  const logKeys = Object.keys(logs).filter(
+    (k) => (logs[k]?.completedHabitIds?.length || 0) > 0
+  );
+  const earliestLogKey = logKeys.length > 0 ? logKeys.sort()[0] : earliestCreatedKey;
+  const earliestActiveKey =
+    earliestLogKey < earliestCreatedKey ? earliestLogKey : earliestCreatedKey;
+
   let currentStreak = 0;
   let longestStreak = 0;
   let runningStreak = 0;
 
-  // Check 120 days backwards to compute streaks
   const daysToCheck = 120;
-  const dayResults: boolean[] = [];
+  const dayStates: Array<'active' | 'missed' | 'free'> = [];
 
   for (let i = 0; i < daysToCheck; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() - i);
-    const dayOfWeek = d.getDay();
     const dateKey = formatDateKey(d);
 
-    const habitsDue = activeHabits.filter((h) => h.daysOfWeek.includes(dayOfWeek));
-    if (habitsDue.length === 0) {
-      // Free day with no habits scheduled doesn't break streak
-      dayResults.push(true);
-      continue;
+    if (dateKey < earliestActiveKey) {
+      break;
     }
 
     const dayLog = logs[dateKey];
-    const completedCount = dayLog ? dayLog.completedHabitIds.filter((id) => habitsDue.some((h) => h.id === id)).length : 0;
+    const skippedIds = dayLog?.skippedHabitIds || [];
+    const completedIds = dayLog?.completedHabitIds || [];
 
-    // Perfect day count
-    if (completedCount >= habitsDue.length && habitsDue.length > 0) {
+    const habitsDue = activeHabits.filter(
+      (h) => isHabitDueOnDate(h, dateKey, logs, true) && !skippedIds.includes(h.id)
+    );
+
+    if (habitsDue.length === 0) {
+      if (completedIds.length > 0) {
+        dayStates.push('active');
+      } else {
+        dayStates.push('free');
+      }
+      continue;
+    }
+
+    const completedDueCount = completedIds.filter((id) =>
+      habitsDue.some((h) => h.id === id)
+    ).length;
+
+    if (completedDueCount >= habitsDue.length && habitsDue.length > 0) {
       perfectDaysCount++;
     }
 
-    // A day is considered sustained if at least 50% or >=1 scheduled habit was completed
-    const dayPassed = completedCount > 0;
-    dayResults.push(dayPassed);
-  }
-
-  // Calculate current streak:
-  // If today has activity, start from today (index 0).
-  // If today has no activity yet, but yesterday had activity (index 1), streak is intact!
-  let startIndex = 0;
-  if (!dayResults[0] && dayResults[1]) {
-    startIndex = 1; // Today is still in progress, count from yesterday
-  }
-
-  if (dayResults[startIndex]) {
-    for (let i = startIndex; i < dayResults.length; i++) {
-      if (dayResults[i]) {
-        currentStreak++;
-      } else {
-        break;
-      }
+    if (completedDueCount > 0 || completedIds.length > 0) {
+      dayStates.push('active');
+    } else {
+      dayStates.push('missed');
     }
   }
 
-  // Longest streak calculation
-  for (let i = dayResults.length - 1; i >= 0; i--) {
-    if (dayResults[i]) {
+  // Calculate current streak from today (index 0) or yesterday (index 1 if today is still in progress)
+  let startIndex = 0;
+  if (dayStates.length > 0 && dayStates[0] !== 'active') {
+    startIndex = 1;
+  }
+
+  for (let i = startIndex; i < dayStates.length; i++) {
+    if (dayStates[i] === 'active') {
+      currentStreak++;
+    } else if (dayStates[i] === 'free') {
+      // Scheduled rest day preserves streak without inflating count
+      continue;
+    } else {
+      break;
+    }
+  }
+
+  // Calculate longest streak chronologically
+  for (let i = dayStates.length - 1; i >= 0; i--) {
+    if (dayStates[i] === 'active') {
       runningStreak++;
       if (runningStreak > longestStreak) {
         longestStreak = runningStreak;
       }
+    } else if (dayStates[i] === 'free') {
+      continue;
     } else {
       runningStreak = 0;
     }
@@ -271,29 +293,37 @@ export function calculateStreakStats(habits: Habit[], logs: HabitLogsMap): UserS
     longestStreak = currentStreak;
   }
 
-  // 7-day and 30-day completion rate
+  // Calculate adherence rate over a window of days (only counting days since habit creation)
   const calcRate = (days: number): number => {
     let totalScheduled = 0;
     let totalDone = 0;
     for (let i = 0; i < days; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
-      const dayOfWeek = d.getDay();
       const dateKey = formatDateKey(d);
-      const habitsDue = activeHabits.filter((h) => h.daysOfWeek.includes(dayOfWeek));
-      totalScheduled += habitsDue.length;
+      if (dateKey < earliestActiveKey) continue;
 
       const dayLog = logs[dateKey];
+      const skippedIds = dayLog?.skippedHabitIds || [];
+      const habitsDue = activeHabits.filter(
+        (h) => isHabitDueOnDate(h, dateKey, logs, true) && !skippedIds.includes(h.id)
+      );
+      totalScheduled += habitsDue.length;
+
       if (dayLog && dayLog.completedHabitIds) {
-        totalDone += dayLog.completedHabitIds.filter((id) => habitsDue.some((h) => h.id === id)).length;
+        totalDone += dayLog.completedHabitIds.filter((id) =>
+          habitsDue.some((h) => h.id === id)
+        ).length;
       }
     }
-    return totalScheduled === 0 ? 100 : Math.min(100, Math.round((totalDone / totalScheduled) * 100));
+    return totalScheduled === 0
+      ? 0
+      : Math.min(100, Math.round((totalDone / totalScheduled) * 100));
   };
 
   return {
     currentStreak,
-    longestStreak: Math.max(longestStreak, currentStreak, 14),
+    longestStreak,
     totalCompletions,
     completionRate7d: calcRate(7),
     completionRate30d: calcRate(30),
@@ -312,16 +342,18 @@ export function getHabitStreak(habitId: string, logs: HabitLogsMap): number {
   const todayKey = formatDateKey(today);
   const todayCompleted = logs[todayKey]?.completedHabitIds?.includes(habitId);
 
-  let checkDate = new Date(today);
+  const checkDate = new Date(today);
   if (!todayCompleted) {
-    // Check if completed yesterday
     checkDate.setDate(checkDate.getDate() - 1);
   }
 
-  while (true) {
+  for (let i = 0; i < 365; i++) {
     const key = formatDateKey(checkDate);
     if (logs[key]?.completedHabitIds?.includes(habitId)) {
       streak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    } else if (logs[key]?.skippedHabitIds?.includes(habitId)) {
+      // Excused rest day preserves streak
       checkDate.setDate(checkDate.getDate() - 1);
     } else {
       break;
@@ -339,6 +371,7 @@ export interface Habit7DayStats {
     dateKey: string;
     dayLetter: string;
     isCompleted: boolean;
+    isSkipped: boolean;
     isScheduled: boolean;
     isToday: boolean;
   }>;
@@ -356,15 +389,15 @@ export function getHabit7DayStats(habit: Habit, logs: HabitLogsMap): Habit7DaySt
   let totalScheduled = 0;
   const days: Habit7DayStats['days'] = [];
 
-  // Last 7 days (6 days ago through today)
   for (let i = 6; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(today.getDate() - i);
     const dateKey = formatDateKey(d);
-    const dayOfWeek = d.getDay();
     const dayLetter = d.toLocaleDateString('en-US', { weekday: 'narrow' });
-    const isScheduled = habit.daysOfWeek.includes(dayOfWeek);
     const isCompleted = !!logs[dateKey]?.completedHabitIds?.includes(habit.id);
+    const isSkipped = !!logs[dateKey]?.skippedHabitIds?.includes(habit.id);
+    const isScheduled =
+      isHabitDueOnDate(habit, dateKey, logs, true) && !isSkipped;
 
     if (isScheduled) {
       totalScheduled++;
@@ -377,18 +410,22 @@ export function getHabit7DayStats(habit: Habit, logs: HabitLogsMap): Habit7DaySt
       dateKey,
       dayLetter,
       isCompleted,
+      isSkipped,
       isScheduled,
       isToday: dateKey === todayKey,
     });
   }
 
-  const denominator = totalScheduled > 0 ? totalScheduled : 7;
-  const percentage = Math.min(100, Math.round((completedCount / denominator) * 100));
+  const denominator = totalScheduled > 0 ? totalScheduled : 1;
+  const percentage =
+    totalScheduled === 0 && completedCount === 0
+      ? 0
+      : Math.min(100, Math.round((completedCount / denominator) * 100));
 
   return {
     percentage,
     completedCount,
-    totalScheduled: denominator,
+    totalScheduled,
     days,
   };
 }
@@ -397,7 +434,7 @@ export const MILESTONES: Milestone[] = [
   {
     id: 'first-step',
     title: 'First Step',
-    description: 'Complete your first habit and ignite the momentum.',
+    description: 'Complete your first habit and ignite daily momentum.',
     requiredStreak: 1,
     icon: 'Sparkles',
     tier: 'bronze',
@@ -405,74 +442,74 @@ export const MILESTONES: Milestone[] = [
   {
     id: 'momentum-3',
     title: 'Consistency Spark',
-    description: 'Maintain a 3-day active streak.',
+    description: 'Maintain a 3-day consecutive active streak.',
     requiredStreak: 3,
     icon: 'Flame',
     tier: 'bronze',
   },
   {
-    id: 'ironclad-7',
-    title: 'Ironclad Routine',
-    description: 'Power through 7 consecutive days of discipline.',
+    id: 'week-warrior',
+    title: 'One-Week Rhythm',
+    description: 'Complete habits for 7 consecutive days across a full week.',
     requiredStreak: 7,
     icon: 'ShieldCheck',
     tier: 'silver',
   },
   {
-    id: 'fortress-14',
-    title: 'Fortress of Focus',
-    description: 'Two full unbroken weeks of daily consistency.',
+    id: 'fortnight-focus',
+    title: 'Two-Week Anchor',
+    description: '14 days of unbroken daily discipline.',
     requiredStreak: 14,
     icon: 'Zap',
     tier: 'silver',
   },
   {
-    id: 'master-30',
-    title: 'Habit Transformation',
-    description: '30-day streak — neural pathways firmly established.',
+    id: 'monthly-master',
+    title: '30-Day Identity Shift',
+    description: '30 consecutive days — your routines are now automatic.',
     requiredStreak: 30,
     icon: 'Trophy',
     tier: 'gold',
   },
   {
-    id: 'century-100',
-    title: 'Century Club',
-    description: '100 days of relentless execution. Elite 1% consistency.',
-    requiredStreak: 100,
+    id: 'centurion-60',
+    title: '60-Day Standard',
+    description: '60 consecutive days of personal accountability.',
+    requiredStreak: 60,
     icon: 'Crown',
     tier: 'platinum',
   },
 ];
 
 export interface NotificationSettings {
-  aggressiveMode: boolean; // default true: enables repeated nags & persistent alerts
-  morningPlanningReminder: boolean; // default true: alerts user to set today's tasks
-  morningPlanningTime: string; // default "08:00"
-  middayCheckinReminder: boolean; // default true: midday check on pending tasks
-  middayCheckinTime: string; // default "13:00"
-  eveningStreakSaver: boolean; // default true: alerts user before end of day
-  eveningStreakSaverTime: string; // default "20:00"
-  overdueNagging: boolean; // default true: alerts repeatedly for overdue tasks
-  overdueNagIntervalMinutes: number; // default 15
-  soundAlerts: boolean; // default true
-  vibrationAlerts: boolean; // default true
-  inAppBannerAlerts: boolean; // default true
+  aggressiveMode: boolean;
+  morningPlanningReminder: boolean;
+  morningPlanningTime: string;
+  overdueNagging: boolean;
+  overdueNagIntervalMinutes: number;
+  middayCheckinReminder: boolean;
+  middayCheckinTime: string;
+  eveningStreakSaver: boolean;
+  eveningStreakSaverTime: string;
+  soundAlertsEnabled: boolean;
+  vibrationEnabled: boolean;
+  inAppBannerAlerts: boolean;
 }
 
-export const NOTIFICATION_SETTINGS_KEY = 'focuspulse_notification_settings_v2';
+export const NOTIFICATION_SETTINGS_KEY = 'focuspulse_notification_settings_v1';
 
 export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   aggressiveMode: true,
   morningPlanningReminder: true,
   morningPlanningTime: '08:00',
+  overdueNagging: true,
+  overdueNagIntervalMinutes: 15,
   middayCheckinReminder: true,
   middayCheckinTime: '13:00',
   eveningStreakSaver: true,
-  eveningStreakSaverTime: '20:00',
-  overdueNagging: true,
-  overdueNagIntervalMinutes: 15,
-  soundAlerts: true,
-  vibrationAlerts: true,
+  eveningStreakSaverTime: '20:30',
+  soundAlertsEnabled: true,
+  vibrationEnabled: true,
   inAppBannerAlerts: true,
 };
 

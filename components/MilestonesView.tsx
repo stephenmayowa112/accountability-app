@@ -13,7 +13,7 @@ import {
   Crown,
   Sparkles,
   Lock,
-  CheckCircle,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface MilestonesViewProps {
@@ -32,7 +32,7 @@ const ICON_COMPONENTS: Record<string, React.ComponentType<{ className?: string }
 export const MilestonesView: React.FC<MilestonesViewProps> = ({ stats }) => {
   const currentStreak = stats.currentStreak;
 
-  const handleCelebrate = (title: string) => {
+  const handleCelebrate = () => {
     triggerConfetti();
     playCelebrationChime();
   };
@@ -40,21 +40,27 @@ export const MilestonesView: React.FC<MilestonesViewProps> = ({ stats }) => {
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="rounded-2xl bg-gradient-to-r from-amber-950/30 via-slate-900/60 to-indigo-950/30 border border-amber-500/20 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
+      <div className="rounded-2xl bg-[#0C1220] border border-slate-800/80 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Trophy className="h-5 w-5 text-amber-400" />
             <h3 className="text-base font-bold text-white">Milestone Trophies & Streaks</h3>
           </div>
           <p className="text-xs text-slate-400 max-w-xl">
-            Unbroken consecutive days unlock permanent tier badges. Your current streak is{' '}
-            <strong className="text-amber-400 font-mono font-bold">{currentStreak} days</strong>.
+            Consecutive active days unlock permanent milestone tiers. Current streak:{' '}
+            <strong className="text-amber-400 font-mono font-bold tabular-nums">
+              {currentStreak} {currentStreak === 1 ? 'day' : 'days'}
+            </strong>{' '}
+            · Personal best:{' '}
+            <strong className="text-slate-200 font-mono font-semibold tabular-nums">
+              {stats.longestStreak} {stats.longestStreak === 1 ? 'day' : 'days'}
+            </strong>
           </p>
         </div>
 
         <button
-          onClick={() => handleCelebrate('Streak')}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 text-xs font-bold hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-amber-500/20 whitespace-nowrap self-stretch sm:self-auto justify-center"
+          onClick={handleCelebrate}
+          className="flex items-center justify-center gap-2 min-h-[40px] px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-semibold active:scale-95 transition-all whitespace-nowrap self-stretch sm:self-auto"
         >
           <Sparkles className="h-4 w-4" />
           Celebrate Momentum
@@ -71,43 +77,44 @@ export const MilestonesView: React.FC<MilestonesViewProps> = ({ stats }) => {
           return (
             <div
               key={badge.id}
-              className={`relative overflow-hidden rounded-2xl border p-5 transition-all ${
+              className={`relative rounded-2xl border p-5 transition-colors ${
                 isUnlocked
-                  ? 'bg-[#0E1628] border-amber-500/40 shadow-xl shadow-amber-500/5'
-                  : 'bg-[#0A0E1A]/80 border-slate-800/80 opacity-70'
+                  ? 'bg-[#0E1628] border-amber-500/40'
+                  : 'bg-[#0A0E1A]/80 border-slate-800/80 opacity-80'
               }`}
             >
               <div className="flex items-start justify-between">
                 <div
-                  className={`flex h-12 w-12 items-center justify-center rounded-2xl border ${
+                  className={`flex h-11 w-11 items-center justify-center rounded-xl border ${
                     isUnlocked
-                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 shadow-md shadow-amber-500/20'
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
                       : 'bg-slate-900 border-slate-800 text-slate-600'
                   }`}
                 >
-                  <IconComp className="h-6 w-6" />
+                  <IconComp className="h-5 w-5" />
                 </div>
 
+                {/* Unboxed status text */}
                 {isUnlocked ? (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                    <CheckCircle className="h-3 w-3" />
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
                     Unlocked
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-full">
-                    <Lock className="h-3 w-3" />
-                    {badge.requiredStreak} days required
+                  <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 tabular-nums">
+                    <Lock className="h-3.5 w-3.5" />
+                    {badge.requiredStreak}d required
                   </span>
                 )}
               </div>
 
               <div className="mt-4">
-                <h4 className="text-base font-bold text-white flex items-center gap-2">
-                  {badge.title}
-                  <span className="text-[10px] font-mono uppercase text-slate-500">
-                    {badge.tier}
-                  </span>
-                </h4>
+                <div className="flex items-center gap-2 text-xs text-slate-400 mb-0.5">
+                  <span className="capitalize">{badge.tier} tier</span>
+                  <span aria-hidden="true">·</span>
+                  <span className="font-mono tabular-nums">{badge.requiredStreak}-day target</span>
+                </div>
+                <h4 className="text-base font-bold text-white">{badge.title}</h4>
                 <p className="mt-1 text-xs text-slate-400 leading-relaxed">
                   {badge.description}
                 </p>
@@ -115,16 +122,16 @@ export const MilestonesView: React.FC<MilestonesViewProps> = ({ stats }) => {
 
               {/* Progress bar towards unlock */}
               <div className="mt-4 pt-3 border-t border-slate-800/60">
-                <div className="flex justify-between text-[11px] text-slate-400 mb-1.5 font-mono">
-                  <span>{isUnlocked ? 'Completed' : `${currentStreak} / ${badge.requiredStreak} days`}</span>
-                  <span className="tabular-nums">{progress}%</span>
+                <div className="flex justify-between text-xs text-slate-400 mb-1.5 font-mono tabular-nums">
+                  <span>
+                    {isUnlocked ? 'Completed' : `${currentStreak} / ${badge.requiredStreak} days`}
+                  </span>
+                  <span>{progress}%</span>
                 </div>
                 <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all duration-700 ${
-                      isUnlocked
-                        ? 'bg-gradient-to-r from-amber-400 to-amber-500'
-                        : 'bg-indigo-500'
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      isUnlocked ? 'bg-amber-400' : 'bg-indigo-500'
                     }`}
                     style={{ width: `${progress}%` }}
                   />
